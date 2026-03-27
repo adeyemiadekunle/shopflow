@@ -2,24 +2,83 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import * as jwt from 'jsonwebtoken';
 import { UsersService } from '../users/users.service';
-import { CreateAdminDto, LoginDto, RegisterDto } from './dto/auth.dto';
+import {
+  CreateAdminDto,
+  LoginDto,
+  RequestPasswordResetDto,
+  ResendVerificationEmailDto,
+  RefreshTokenDto,
+  ResetPasswordDto,
+  RegisterDto,
+  VerifyEmailDto,
+} from './dto/auth.dto';
 import { UserRole } from '../users/enums/user-role.enum';
+import { JwtPayload } from './strategies/jwt.strategy';
+import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly usersService: UsersService,
     private readonly config: ConfigService,
+    private readonly mailService: MailService,
   ) {}
 
   private async hashValue(value: string): Promise<string> {
     return bcrypt.hash(value, 12);
+  }
+
+  private generateOpaqueToken(): string {
+    return crypto.randomBytes(32).toString('hex');
+  }
+
+  private createExpiry(minutes: number): Date {
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + minutes);
+    return expiresAt;
+  }
+
+  private async issueEmailVerificationToken(
+    userId: string,
+    email: string,
+  ): Promise<void> {
+    const token = this.generateOpaqueToken();
+    const tokenHash = await this.hashValue(token);
+
+    await this.usersService.save({
+      id: userId,
+      emailVerificationTokenHash: tokenHash,
+      emailVerificationTokenExpiresAt: this.createExpiry(60),
+    });
+
+    await this.mailService.sendVerificationEmail(email, token);
+  }
+
+  private async issuePasswordResetToken(
+    userId: string,
+    email: string,
+  ): Promise<void> {
+    const token = this.generateOpaqueToken();
+    const tokenHash = await this.hashValue(token);
+
+    await this.usersService.save({
+      id: userId,
+      passwordResetTokenHash: tokenHash,
+      passwordResetTokenExpiresAt: this.createExpiry(30),
+    });
+
+    await this.mailService.sendPasswordResetEmail(email, token);
   }
 
   private signAccessToken(userId: string, email: string, role: string): string {
@@ -33,7 +92,9 @@ export class AuthService {
   private signRefreshToken(userId: string): string {
     const secret = this.config.get<string>('jwt.refreshSecret') ?? '';
     const expiresIn = this.config.get<string>('jwt.refreshExpiresIn') ?? '7d';
-    return jwt.sign({ sub: userId }, secret, { expiresIn } as jwt.SignOptions);
+    return jwt.sign({ sub: userId, jti: crypto.randomUUID() }, secret, {
+      expiresIn,
+    } as jwt.SignOptions);
   }
 
   /** Self-registration for BUYER or SELLER accounts only */
@@ -52,8 +113,18 @@ export class AuthService {
     });
     await this.usersService.save(user);
 
+    try {
+      await this.issueEmailVerificationToken(user.id, user.email);
+    } catch (error) {
+      this.logger.error(
+        `Failed to send verification email to ${user.email}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+    }
+
     return {
-      message: 'Registration successful. Please verify your email.',
+      message:
+        'Registration successful. Please verify your email before signing in.',
       role,
     };
   }
@@ -73,6 +144,8 @@ export class AuthService {
       firstName: dto.firstName,
       lastName: dto.lastName,
       role: UserRole.ADMIN,
+      isEmailVerified: true,
+      emailVerifiedAt: new Date(),
     });
     await this.usersService.save(user);
     return { message: 'Admin account created.' };
@@ -94,6 +167,12 @@ export class AuthService {
     if (!passwordValid) throw new UnauthorizedException('Invalid credentials');
 
     if (!user.isActive) throw new ForbiddenException('Account suspended');
+
+    if (!user.isEmailVerified && user.role !== UserRole.ADMIN) {
+      throw new ForbiddenException(
+        'Email not verified. Please verify your email before signing in.',
+      );
+    }
 
     if (dto.expectedRole && user.role !== dto.expectedRole) {
       throw new ForbiddenException(
@@ -131,6 +210,130 @@ export class AuthService {
       refreshToken: newRefreshToken,
       role: user.role,
     };
+  }
+
+  async refresh(dto: RefreshTokenDto) {
+    const secret = this.config.get<string>('jwt.refreshSecret') ?? '';
+
+    let payload: JwtPayload;
+    try {
+      payload = jwt.verify(dto.refreshToken, secret) as JwtPayload;
+    } catch {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    if (!payload.sub) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    return this.refreshTokens(payload.sub, dto.refreshToken);
+  }
+
+  async verifyEmail(dto: VerifyEmailDto) {
+    const user = await this.usersService.findByEmailWithSecurityFields(
+      dto.email,
+    );
+    if (!user) throw new NotFoundException('User not found');
+
+    if (user.isEmailVerified) {
+      return { message: 'Email is already verified.' };
+    }
+
+    if (
+      !user.emailVerificationTokenHash ||
+      !user.emailVerificationTokenExpiresAt ||
+      user.emailVerificationTokenExpiresAt < new Date()
+    ) {
+      throw new UnauthorizedException(
+        'Verification token is invalid or expired',
+      );
+    }
+
+    const matches = await bcrypt.compare(
+      dto.token,
+      user.emailVerificationTokenHash,
+    );
+    if (!matches) {
+      throw new UnauthorizedException(
+        'Verification token is invalid or expired',
+      );
+    }
+
+    await this.usersService.save({
+      id: user.id,
+      isEmailVerified: true,
+      emailVerifiedAt: new Date(),
+      emailVerificationTokenHash: undefined,
+      emailVerificationTokenExpiresAt: undefined,
+    });
+
+    return { message: 'Email verified successfully.' };
+  }
+
+  async resendVerificationEmail(dto: ResendVerificationEmailDto) {
+    const user = await this.usersService.findByEmail(dto.email);
+    if (!user) {
+      return {
+        message:
+          'If an account with that email exists, a verification email has been sent.',
+      };
+    }
+
+    if (user.isEmailVerified) {
+      return { message: 'Email is already verified.' };
+    }
+
+    await this.issueEmailVerificationToken(user.id, user.email);
+    return { message: 'Verification email sent.' };
+  }
+
+  async requestPasswordReset(dto: RequestPasswordResetDto) {
+    const user = await this.usersService.findByEmail(dto.email);
+    if (user) {
+      await this.issuePasswordResetToken(user.id, user.email);
+    }
+
+    return {
+      message:
+        'If an account with that email exists, a password reset email has been sent.',
+    };
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const user = await this.usersService.findByEmailWithSecurityFields(
+      dto.email,
+    );
+    if (
+      !user?.passwordResetTokenHash ||
+      !user.passwordResetTokenExpiresAt ||
+      user.passwordResetTokenExpiresAt < new Date()
+    ) {
+      throw new UnauthorizedException(
+        'Password reset token is invalid or expired',
+      );
+    }
+
+    const matches = await bcrypt.compare(
+      dto.token,
+      user.passwordResetTokenHash,
+    );
+    if (!matches) {
+      throw new UnauthorizedException(
+        'Password reset token is invalid or expired',
+      );
+    }
+
+    const passwordHash = await this.hashValue(dto.password);
+    await this.usersService.save({
+      id: user.id,
+      passwordHash,
+      refreshTokenHash: undefined,
+      passwordResetTokenHash: undefined,
+      passwordResetTokenExpiresAt: undefined,
+      passwordChangedAt: new Date(),
+    });
+
+    return { message: 'Password reset successful.' };
   }
 
   async logout(userId: string): Promise<void> {

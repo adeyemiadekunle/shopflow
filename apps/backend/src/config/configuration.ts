@@ -3,6 +3,7 @@ export default () => ({
     name: process.env['APP_NAME'] ?? 'rands-api',
     port: parseInt(process.env['PORT'] ?? '3000', 10),
     env: process.env['NODE_ENV'] ?? 'development',
+    baseUrl: process.env['APP_BASE_URL'] ?? 'http://localhost:3000',
     corsOrigins: (process.env['CORS_ORIGINS'] ?? 'http://localhost:3000').split(
       ',',
     ),
@@ -27,6 +28,16 @@ export default () => ({
       process.env['JWT_REFRESH_SECRET'] ?? 'fallback_refresh_secret',
     accessExpiresIn: process.env['JWT_ACCESS_EXPIRES_IN'] ?? '15m',
     refreshExpiresIn: process.env['JWT_REFRESH_EXPIRES_IN'] ?? '7d',
+  },
+  mail: {
+    from: process.env['MAIL_FROM'] ?? 'no-reply@rands.local',
+    smtpHost: process.env['SMTP_HOST'] ?? '',
+    smtpPort: parseInt(process.env['SMTP_PORT'] ?? '587', 10),
+    smtpUser: process.env['SMTP_USER'] ?? '',
+    smtpPass: process.env['SMTP_PASS'] ?? '',
+    smtpSecure: process.env['SMTP_SECURE'] === 'true',
+    frontendBaseUrl:
+      process.env['FRONTEND_BASE_URL'] ?? 'http://localhost:3001',
   },
   paystack: {
     secretKey: process.env['PAYSTACK_SECRET_KEY'] ?? '',

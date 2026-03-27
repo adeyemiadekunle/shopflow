@@ -18,6 +18,8 @@ npm run start:dev
 ```
 
 - **API:** `http://localhost:3000/api/v1`
+- **Health:** `http://localhost:3000/health`
+- **Metrics:** `http://localhost:3000/api/v1/metrics`
 - **Swagger:** `http://localhost:3000/api-docs`
 
 ## Commands
@@ -26,6 +28,8 @@ npm run start:dev
 npm run start:dev    # Dev server (watch)
 npm run build        # Production build
 npm run start:prod   # Start production build
+npm run db:migrate   # Run DB migrations
+npm run db:migrate:revert # Revert latest migration
 npm test             # Unit tests
 npm run test:cov     # Test coverage
 npm run lint         # ESLint
@@ -37,10 +41,14 @@ Copy `.env.example` to `.env` and fill in:
 
 | Variable | Description |
 |---|---|
-| `DATABASE_URL` | PostgreSQL connection string |
+| `DB_HOST` / `DB_PORT` | PostgreSQL host and port |
+| `DB_USERNAME` / `DB_PASSWORD` / `DB_NAME` | PostgreSQL credentials and database |
 | `REDIS_HOST` / `REDIS_PORT` | Redis connection |
 | `JWT_ACCESS_SECRET` | Access token signing secret |
 | `JWT_REFRESH_SECRET` | Refresh token signing secret |
+| `APP_BASE_URL` | Backend base URL |
+| `MAIL_FROM` / `SMTP_*` | SMTP sender and transport settings |
+| `FRONTEND_BASE_URL` | Frontend URL used in email links |
 | `PAYSTACK_SECRET_KEY` | Paystack API secret |
 | `PAYSTACK_WEBHOOK_SECRET` | Webhook HMAC secret |
 | `PLATFORM_CURRENCY` | ISO 4217 code for this deployment (e.g. `NGN`) |
@@ -54,7 +62,7 @@ Copy `.env.example` to `.env` and fill in:
 
 | Module | Base path | Description |
 |---|---|---|
-| auth | `/auth` | Register (buyer/seller), login (all roles), admin creation |
+| auth | `/auth` | Register, login, refresh, email verification, password reset, admin creation |
 | users | `/users` | User accounts, roles |
 | sellers | `/sellers` | Profiles, KYC (NIN/BVN), bank accounts |
 | catalog | `/catalog` | Products, variants, media, categories, discounts |
@@ -66,12 +74,13 @@ Copy `.env.example` to `.env` and fill in:
 | feed | `/feed` | Instagram-style social feed: posts, likes, comments, follow/unfollow |
 | chat | `/chat` + WebSocket | Buyer↔seller 1:1 real-time messaging (Socket.IO) + REST conversation management |
 | health | `/health` | DB + memory health checks |
+| metrics | `/api/v1/metrics` | Prometheus scrape endpoint |
 
 ## Testing
 
 ```bash
-npm test              # 10/10 tests passing
+npm test              # 16/16 tests passing
 npm run test:cov      # Coverage report
 ```
 
-> Test suites: `AppController`, `LedgerService`, `OrdersService`.
+> Test suites: `AppController`, `AuthService`, `LedgerService`, `OrdersService`.

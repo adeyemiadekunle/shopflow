@@ -3,7 +3,7 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { OrdersService } from './orders.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { User } from '../users/entities/user.entity';
+import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 
 @ApiTags('orders')
 @UseGuards(JwtAuthGuard)
@@ -13,7 +13,7 @@ export class OrdersController {
 
   @Get('my')
   @ApiOperation({ summary: 'Get current user orders (buyer)' })
-  getMyOrders(@CurrentUser() user: User) {
+  getMyOrders(@CurrentUser() user: AuthenticatedUser) {
     return this.ordersService.findByBuyer(user.id);
   }
 

@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { LoggerModule } from 'nestjs-pino';
+import { PrometheusModule } from '@willsoto/nestjs-prometheus';
 import configuration from './config/configuration';
 
 // Common
@@ -23,6 +24,7 @@ import { SubscriptionsModule } from './modules/subscriptions/subscriptions.modul
 import { PlatformConfigModule } from './modules/platform-config/platform-config.module';
 import { FeedModule } from './modules/feed/feed.module';
 import { ChatModule } from './modules/chat/chat.module';
+import { MetricsController } from './modules/health/metrics.controller';
 
 // Entities
 import { User } from './modules/users/entities/user.entity';
@@ -82,6 +84,10 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
     }),
 
     // ── Database ─────────────────────────────────────────────────────────────
+    PrometheusModule.register({
+      controller: MetricsController,
+    }),
+
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({

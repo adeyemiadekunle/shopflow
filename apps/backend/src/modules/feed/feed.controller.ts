@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -11,6 +12,7 @@ import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { FeedService } from './feed.service';
 import { CreateFeedPostDto, CreateCommentDto } from './dto/feed.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { Public } from '../../common/decorators/public.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../users/enums/user-role.enum';
@@ -25,7 +27,13 @@ export class FeedController {
   @Post('posts')
   @Roles(UserRole.SELLER)
   @ApiOperation({ summary: 'Create a new feed post (seller only)' })
-  createPost(@CurrentUser() user: any, @Body() dto: CreateFeedPostDto) {
+  createPost(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateFeedPostDto,
+  ) {
+    if (!user.sellerProfileId) {
+      throw new BadRequestException('Seller profile is required');
+    }
     return this.feedService.createPost(user.sellerProfileId, dto);
   }
 
@@ -34,12 +42,12 @@ export class FeedController {
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
   getPersonalisedFeed(
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
     return this.feedService.getPersonalisedFeed(
-      user.sub,
+      user.id,
       page ? parseInt(page, 10) : 1,
       limit ? parseInt(limit, 10) : 20,
     );
@@ -66,10 +74,10 @@ export class FeedController {
 
   @Delete('posts/:id')
   @ApiOperation({ summary: 'Archive a post (seller owner or admin)' })
-  archivePost(@Param('id') id: string, @CurrentUser() user: any) {
+  archivePost(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.feedService.archivePost(
       id,
-      user.sub,
+      user.id,
       user.role === UserRole.ADMIN,
     );
   }
@@ -78,8 +86,8 @@ export class FeedController {
 
   @Post('posts/:id/like')
   @ApiOperation({ summary: 'Toggle like on a post' })
-  toggleLike(@Param('id') id: string, @CurrentUser() user: any) {
-    return this.feedService.toggleLike(id, user.sub);
+  toggleLike(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.feedService.toggleLike(id, user.id);
   }
 
   // ─── Comments ──────────────────────────────────────────────────────────────
@@ -105,18 +113,21 @@ export class FeedController {
   @ApiOperation({ summary: 'Add a comment to a post' })
   addComment(
     @Param('id') id: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateCommentDto,
   ) {
-    return this.feedService.addComment(id, user.sub, dto);
+    return this.feedService.addComment(id, user.id, dto);
   }
 
   @Delete('comments/:id')
   @ApiOperation({ summary: 'Delete a comment (owner or admin)' })
-  deleteComment(@Param('id') id: string, @CurrentUser() user: any) {
+  deleteComment(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
     return this.feedService.deleteComment(
       id,
-      user.sub,
+      user.id,
       user.role === UserRole.ADMIN,
     );
   }
@@ -128,9 +139,9 @@ export class FeedController {
   @ApiOperation({ summary: 'Follow a seller' })
   follow(
     @Param('sellerProfileId') sellerProfileId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.feedService.follow(user.sub, sellerProfileId);
+    return this.feedService.follow(user.id, sellerProfileId);
   }
 
   @Delete('follow/:sellerProfileId')
@@ -138,14 +149,14 @@ export class FeedController {
   @ApiOperation({ summary: 'Unfollow a seller' })
   unfollow(
     @Param('sellerProfileId') sellerProfileId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.feedService.unfollow(user.sub, sellerProfileId);
+    return this.feedService.unfollow(user.id, sellerProfileId);
   }
 
   @Get('following')
   @ApiOperation({ summary: 'List sellers the current user follows' })
-  getFollowing(@CurrentUser() user: any) {
-    return this.feedService.getFollowing(user.sub);
+  getFollowing(@CurrentUser() user: AuthenticatedUser) {
+    return this.feedService.getFollowing(user.id);
   }
 }

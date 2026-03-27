@@ -84,7 +84,10 @@ cp .env.example .env
 cd ../..
 docker compose up -d postgres redis
 
-# 4. Start the API in dev/watch mode from the repo root
+# 4. Run database migrations
+npm run db:migrate
+
+# 5. Start the API in dev/watch mode from the repo root
 npm run dev
 ```
 
@@ -99,10 +102,14 @@ See [`apps/backend/.env.example`](apps/backend/.env.example) for the full list. 
 
 | Variable | Description |
 |---|---|
-| `DATABASE_URL` | PostgreSQL connection string |
+| `DB_HOST` / `DB_PORT` | PostgreSQL host and port |
+| `DB_USERNAME` / `DB_PASSWORD` / `DB_NAME` | PostgreSQL credentials and database |
 | `REDIS_HOST` / `REDIS_PORT` | Redis connection |
 | `JWT_ACCESS_SECRET` | Secret for access tokens |
 | `JWT_REFRESH_SECRET` | Secret for refresh tokens |
+| `APP_BASE_URL` | Backend base URL used for generated links |
+| `MAIL_FROM` / `SMTP_*` | SMTP sender and transport settings |
+| `FRONTEND_BASE_URL` | Frontend URL used in verification/reset links |
 | `PAYSTACK_SECRET_KEY` | Paystack secret key (from dashboard) |
 | `PAYSTACK_WEBHOOK_SECRET` | HMAC secret for webhook verification |
 | `PLATFORM_CURRENCY` | ISO 4217 currency code for this deployment (e.g. `NGN`, `GHS`) |
@@ -119,6 +126,12 @@ See [`apps/backend/.env.example`](apps/backend/.env.example) for the full list. 
 ```bash
 # Development (watch mode from repo root)
 npm run dev
+
+# Run pending database migrations
+npm run db:migrate
+
+# Revert the latest migration
+npm run db:migrate:revert
 
 # Production build
 npm run build
@@ -143,6 +156,11 @@ Protected routes require `Authorization: Bearer <access_token>`.
 |---|---|---|---|
 | POST | `/register` | Public | Register buyer or seller (`role: "buyer"\|"seller"`) |
 | POST | `/login` | Public | Login for all roles. Pass `expectedRole` to enforce portal validation |
+| POST | `/refresh` | Public | Rotate access and refresh tokens |
+| POST | `/verify-email` | Public | Verify email using one-time token |
+| POST | `/verify-email/resend` | Public | Resend verification email |
+| POST | `/forgot-password` | Public | Request password reset email |
+| POST | `/reset-password` | Public | Reset password using one-time token |
 | POST | `/logout` | User | Invalidate refresh token |
 | POST | `/admin` | Admin | Create admin account |
 
@@ -267,7 +285,7 @@ JWT auth via `auth.token` in the Socket.IO handshake.
 | PATCH | `/admin/tiers/:id` | Admin | Update price, currency, features |
 | POST | `/admin/tiers/seed` | Admin | Bootstrap default tiers |
 
-### Health — `/api/v1/health`
+### Health — `/health`
 
 Database and memory health checks via `@nestjs/terminus`.
 
@@ -341,7 +359,7 @@ npm run test:watch
 npm run test:cov
 ```
 
-Current test suites: `AppController`, `LedgerService`, `OrdersService` — 10/10 passing.
+Current test suites: `AppController`, `AuthService`, `LedgerService`, `OrdersService` — 16/16 passing.
 
 ---
 
@@ -353,11 +371,17 @@ docker compose up -d
 
 # Services
 # API        → http://localhost:3000
+# Health     → http://localhost:3000/health
+# Metrics    → http://localhost:3000/api/v1/metrics
 # Swagger    → http://localhost:3000/api-docs
-# Grafana    → http://localhost:3001  (admin/admin)
+# Grafana    → http://localhost:3001
 # Prometheus → http://localhost:9090
 # Loki       → http://localhost:3100
 ```
+
+Grafana local login:
+- Username: `admin`
+- Password: `admin`
 
 The Docker Compose stack includes:
 
