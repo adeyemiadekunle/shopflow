@@ -42,6 +42,40 @@ export class User {
   @Column({ name: 'refresh_token_hash', nullable: true, select: false })
   refreshTokenHash?: string;
 
+  @Column({
+    name: 'email_verification_token_hash',
+    nullable: true,
+    select: false,
+  })
+  emailVerificationTokenHash?: string;
+
+  @Column({
+    name: 'email_verification_token_expires_at',
+    type: 'timestamp',
+    nullable: true,
+  })
+  emailVerificationTokenExpiresAt?: Date;
+
+  @Column({ name: 'email_verified_at', type: 'timestamp', nullable: true })
+  emailVerifiedAt?: Date;
+
+  @Column({
+    name: 'password_reset_token_hash',
+    nullable: true,
+    select: false,
+  })
+  passwordResetTokenHash?: string;
+
+  @Column({
+    name: 'password_reset_token_expires_at',
+    type: 'timestamp',
+    nullable: true,
+  })
+  passwordResetTokenExpiresAt?: Date;
+
+  @Column({ name: 'password_changed_at', type: 'timestamp', nullable: true })
+  passwordChangedAt?: Date;
+
   @OneToOne(() => SellerProfile, (profile) => profile.user, { nullable: true })
   sellerProfile?: SellerProfile;
 

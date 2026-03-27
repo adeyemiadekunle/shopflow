@@ -8,12 +8,21 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { CreateAdminDto, LoginDto, RegisterDto } from './dto/auth.dto';
+import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
+import {
+  CreateAdminDto,
+  LoginDto,
+  RequestPasswordResetDto,
+  ResendVerificationEmailDto,
+  RefreshTokenDto,
+  ResetPasswordDto,
+  RegisterDto,
+  VerifyEmailDto,
+} from './dto/auth.dto';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { User } from '../users/entities/user.entity';
 import { UserRole } from '../users/enums/user-role.enum';
 
 @ApiTags('auth')
@@ -55,13 +64,40 @@ export class AuthController {
   @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Refresh access + refresh tokens' })
-  refresh() {
-    // In production the userId is decoded from the refresh JWT itself.
-    // Placeholder — JWT refresh strategy guard handles this via Passport.
-    return {
-      message:
-        'Use the jwt-refresh guard in your middleware for production refresh.',
-    };
+  refresh(@Body() dto: RefreshTokenDto) {
+    return this.authService.refresh(dto);
+  }
+
+  @Post('verify-email')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify email using a one-time token' })
+  verifyEmail(@Body() dto: VerifyEmailDto) {
+    return this.authService.verifyEmail(dto);
+  }
+
+  @Post('verify-email/resend')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Resend verification email' })
+  resendVerificationEmail(@Body() dto: ResendVerificationEmailDto) {
+    return this.authService.resendVerificationEmail(dto);
+  }
+
+  @Post('forgot-password')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Request a password reset email' })
+  requestPasswordReset(@Body() dto: RequestPasswordResetDto) {
+    return this.authService.requestPasswordReset(dto);
+  }
+
+  @Post('reset-password')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reset password using a one-time token' })
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto);
   }
 
   /**
@@ -71,7 +107,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Logout and invalidate refresh token' })
-  logout(@CurrentUser() user: User) {
+  logout(@CurrentUser() user: AuthenticatedUser) {
     return this.authService.logout(user.id);
   }
 

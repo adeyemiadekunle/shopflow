@@ -16,6 +16,7 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: production
+      SWAGGER_ENABLED: 'true'
       PORT: 3000
       DB_HOST: postgres
       DB_PORT: 5432

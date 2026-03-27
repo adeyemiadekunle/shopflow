@@ -12,8 +12,8 @@ async function bootstrap() {
   });
 
   const config = app.get(ConfigService);
-  const env = config.get<string>('app.env') ?? 'development';
   const port = config.get<number>('app.port') ?? 3000;
+  const swaggerEnabled = config.get<boolean>('app.swaggerEnabled') ?? false;
   const corsOrigins = config.get<string[]>('app.corsOrigins') ?? [];
 
   // ── Pino structured logger ──────────────────────────────────────────
@@ -36,7 +36,7 @@ async function bootstrap() {
   );
 
   // ── Swagger / OpenAPI ───────────────────────────────────────────────
-  if (env !== 'production') {
+  if (swaggerEnabled) {
     const swaggerConfig = new DocumentBuilder()
       .setTitle('Rands API')
       .setDescription('Rands Social Ecommerce Platform — Backend API')
@@ -57,7 +57,7 @@ async function bootstrap() {
 
   await app.listen(port);
   console.log(`🚀 Rands API running on: http://localhost:${port}/api/v1`);
-  if (env !== 'production') {
+  if (swaggerEnabled) {
     console.log(`📖 Swagger docs: http://localhost:${port}/api-docs`);
   }
 }

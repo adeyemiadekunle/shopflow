@@ -76,6 +76,43 @@ export class RefreshTokenDto {
   refreshToken!: string;
 }
 
+export class VerifyEmailDto {
+  @ApiProperty({ example: 'buyer@example.com' })
+  @IsEmail()
+  email!: string;
+
+  @ApiProperty()
+  @IsString()
+  token!: string;
+}
+
+export class ResendVerificationEmailDto {
+  @ApiProperty({ example: 'buyer@example.com' })
+  @IsEmail()
+  email!: string;
+}
+
+export class RequestPasswordResetDto {
+  @ApiProperty({ example: 'buyer@example.com' })
+  @IsEmail()
+  email!: string;
+}
+
+export class ResetPasswordDto {
+  @ApiProperty({ example: 'buyer@example.com' })
+  @IsEmail()
+  email!: string;
+
+  @ApiProperty()
+  @IsString()
+  token!: string;
+
+  @ApiProperty({ example: 'NewSecurePass123!' })
+  @IsString()
+  @MinLength(8)
+  password!: string;
+}
+
 /** Admin-only DTO to create an admin account */
 export class CreateAdminDto {
   @ApiProperty({ example: 'admin@rands.ng' })
