@@ -4,6 +4,10 @@ export default () => ({
     port: parseInt(process.env['PORT'] ?? '3000', 10),
     env: process.env['NODE_ENV'] ?? 'development',
     baseUrl: process.env['APP_BASE_URL'] ?? 'http://localhost:3000',
+    swaggerEnabled:
+      process.env['SWAGGER_ENABLED'] === 'true' ||
+      ((process.env['SWAGGER_ENABLED'] ?? '') === '' &&
+        (process.env['NODE_ENV'] ?? 'development') !== 'production'),
     corsOrigins: (process.env['CORS_ORIGINS'] ?? 'http://localhost:3000').split(
       ',',
     ),
