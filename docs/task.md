@@ -42,3 +42,13 @@
 - [ ] `npm run test` passes
 - [ ] `docker compose up` starts all services
 - [ ] `/health` and Swagger reachable
+
+## Phase 7: Queue and Financial Correctness
+- [ ] Add BullMQ + Redis worker foundation
+- [ ] Queue Paystack webhook and payment post-processing
+- [ ] Connect payment success to immutable ledger entries
+- [ ] Add reconciliation jobs for orders, payments, and ledger state
+- [ ] Queue slow order, notification, and external-service side effects
+- [ ] Add retry, DLQ, and queue observability
+
+See `docs/queue_and_financial_correctness_todo.md` for the detailed implementation tracker.
