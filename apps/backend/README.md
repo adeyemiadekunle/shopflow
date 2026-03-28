@@ -19,8 +19,11 @@ npm run start:dev
 
 - **API:** `http://localhost:3000/api/v1`
 - **Health:** `http://localhost:3000/health`
+- **Queue Health:** `http://localhost:3000/health/queues`
 - **Metrics:** `http://localhost:3000/api/v1/metrics`
 - **Swagger:** `http://localhost:3000/api-docs`
+- **Grafana Queue Dashboard:** `Rands / Queue Monitoring`
+- **Grafana API Dashboard:** `Rands / API and Payments Overview`
 
 ## Commands
 
@@ -74,6 +77,7 @@ Copy `.env.example` to `.env` and fill in:
 | feed | `/feed` | Instagram-style social feed: posts, likes, comments, follow/unfollow |
 | chat | `/chat` + WebSocket | Buyer↔seller 1:1 real-time messaging (Socket.IO) + REST conversation management |
 | health | `/health` | DB + memory health checks |
+| queue-health | `/health/queues` | Queue backlog summary for payments, orders, and dead-letter |
 | metrics | `/api/v1/metrics` | Prometheus scrape endpoint |
 
 ## Testing

@@ -5,6 +5,7 @@ import {
   QUEUE_CONNECTION_OPTIONS,
   QUEUE_DEFAULT_JOB_OPTIONS,
 } from './queue.constants';
+import { QueueMonitoringService } from './queue-monitoring.service';
 
 type QueueConnectionOptions = {
   host: string;
@@ -45,7 +46,12 @@ type QueueConnectionOptions = {
         },
       }),
     },
+    QueueMonitoringService,
   ],
-  exports: [QUEUE_CONNECTION_OPTIONS, QUEUE_DEFAULT_JOB_OPTIONS],
+  exports: [
+    QUEUE_CONNECTION_OPTIONS,
+    QUEUE_DEFAULT_JOB_OPTIONS,
+    QueueMonitoringService,
+  ],
 })
 export class QueueModule {}
