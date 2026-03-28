@@ -11,6 +11,10 @@ export class UsersService {
     private readonly usersRepo: Repository<User>,
   ) {}
 
+  private normalizeEmail(email: string): string {
+    return email.trim().toLowerCase();
+  }
+
   findById(id: string): Promise<User | null> {
     return this.usersRepo.findOne({ where: { id } });
   }
@@ -34,17 +38,13 @@ export class UsersService {
   }
 
   findByEmail(email: string): Promise<User | null> {
-    return this.usersRepo.findOne({
-      where: { email },
-      select: [
-        'id',
-        'email',
-        'passwordHash',
-        'role',
-        'isActive',
-        'isEmailVerified',
-      ],
-    });
+    return this.usersRepo
+      .createQueryBuilder('user')
+      .addSelect('user.passwordHash')
+      .where('LOWER(user.email) = :email', {
+        email: this.normalizeEmail(email),
+      })
+      .getOne();
   }
 
   findByEmailWithTokenHash(email: string): Promise<User | null> {
@@ -52,7 +52,9 @@ export class UsersService {
       .createQueryBuilder('user')
       .addSelect('user.passwordHash')
       .addSelect('user.refreshTokenHash')
-      .where('user.email = :email', { email })
+      .where('LOWER(user.email) = :email', {
+        email: this.normalizeEmail(email),
+      })
       .getOne();
   }
 
@@ -71,7 +73,9 @@ export class UsersService {
       .addSelect('user.refreshTokenHash')
       .addSelect('user.emailVerificationTokenHash')
       .addSelect('user.passwordResetTokenHash')
-      .where('user.email = :email', { email })
+      .where('LOWER(user.email) = :email', {
+        email: this.normalizeEmail(email),
+      })
       .getOne();
   }
 

@@ -37,6 +37,10 @@ export class AuthService {
     return bcrypt.hash(value, 12);
   }
 
+  private normalizeEmail(email: string): string {
+    return email.trim().toLowerCase();
+  }
+
   private generateOpaqueToken(): string {
     return crypto.randomBytes(32).toString('hex');
   }
@@ -97,13 +101,14 @@ export class AuthService {
 
   /** Self-registration for BUYER or SELLER accounts only */
   async register(dto: RegisterDto) {
-    const existing = await this.usersService.findByEmail(dto.email);
+    const email = this.normalizeEmail(dto.email);
+    const existing = await this.usersService.findByEmail(email);
     if (existing) throw new ConflictException('Email already registered');
 
     const role = dto.role ?? UserRole.BUYER;
     const passwordHash = await this.hashValue(dto.password);
     const user = this.usersService.create({
-      email: dto.email,
+      email,
       passwordHash,
       firstName: dto.firstName,
       lastName: dto.lastName,
@@ -132,12 +137,13 @@ export class AuthService {
    * Called by an existing admin — route must be protected with @Roles(UserRole.ADMIN).
    */
   async createAdmin(dto: CreateAdminDto) {
-    const existing = await this.usersService.findByEmail(dto.email);
+    const email = this.normalizeEmail(dto.email);
+    const existing = await this.usersService.findByEmail(email);
     if (existing) throw new ConflictException('Email already registered');
 
     const passwordHash = await this.hashValue(dto.password);
     const user = this.usersService.create({
-      email: dto.email,
+      email,
       passwordHash,
       firstName: dto.firstName,
       lastName: dto.lastName,
@@ -155,7 +161,9 @@ export class AuthService {
    * (useful for role-specific portals to reject wrong users).
    */
   async login(dto: LoginDto) {
-    const user = await this.usersService.findByEmailWithTokenHash(dto.email);
+    const user = await this.usersService.findByEmailWithTokenHash(
+      this.normalizeEmail(dto.email),
+    );
     if (!user) throw new UnauthorizedException('Invalid credentials');
 
     const passwordValid = await bcrypt.compare(
@@ -212,7 +220,7 @@ export class AuthService {
 
   async verifyEmail(dto: VerifyEmailDto) {
     const user = await this.usersService.findByEmailWithSecurityFields(
-      dto.email,
+      this.normalizeEmail(dto.email),
     );
     if (!user) throw new NotFoundException('User not found');
 
@@ -252,7 +260,9 @@ export class AuthService {
   }
 
   async resendVerificationEmail(dto: ResendVerificationEmailDto) {
-    const user = await this.usersService.findByEmail(dto.email);
+    const user = await this.usersService.findByEmail(
+      this.normalizeEmail(dto.email),
+    );
     if (!user) {
       return {
         message:
@@ -269,7 +279,9 @@ export class AuthService {
   }
 
   async requestPasswordReset(dto: RequestPasswordResetDto) {
-    const user = await this.usersService.findByEmail(dto.email);
+    const user = await this.usersService.findByEmail(
+      this.normalizeEmail(dto.email),
+    );
     if (user) {
       await this.issuePasswordResetToken(user.id, user.email);
     }
@@ -282,7 +294,7 @@ export class AuthService {
 
   async resetPassword(dto: ResetPasswordDto) {
     const user = await this.usersService.findByEmailWithSecurityFields(
-      dto.email,
+      this.normalizeEmail(dto.email),
     );
     if (
       !user?.passwordResetTokenHash ||
