@@ -17,7 +17,13 @@ import {
   QUEUE_CONNECTION_OPTIONS,
   QueueName,
 } from '../queue/queue.constants';
+import { DeliveryQuote, QuoteStatus } from './entities/delivery-quote.entity';
+import {
+  FulfilmentEvent,
+  FulfilmentEventType,
+} from './entities/fulfilment-event.entity';
 import { Order } from './entities/order.entity';
+import { OrderStatus } from './enums/order-status.enum';
 
 type QueueConnectionOptions = {
   host: string;
@@ -52,6 +58,10 @@ export class OrdersProcessor implements OnModuleInit, OnModuleDestroy {
   constructor(
     @InjectRepository(Order)
     private readonly orderRepo: Repository<Order>,
+    @InjectRepository(DeliveryQuote)
+    private readonly deliveryQuoteRepo: Repository<DeliveryQuote>,
+    @InjectRepository(FulfilmentEvent)
+    private readonly fulfilmentEventRepo: Repository<FulfilmentEvent>,
     @Inject(QUEUE_CONNECTION_OPTIONS)
     private readonly connection: QueueConnectionOptions,
     @Inject(DEAD_LETTER_QUEUE)
@@ -120,6 +130,119 @@ export class OrdersProcessor implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  private async processSellerQuoteReminder(
+    job: OrderNotificationJob,
+  ): Promise<void> {
+    const order = await this.getOrderForNotification(job.data.orderId);
+
+    if (order.status !== OrderStatus.AWAITING_DELIVERY_QUOTE) {
+      return;
+    }
+
+    const sellerEmail = order.sellerProfile.user?.email;
+    if (!sellerEmail) {
+      this.logger.warn(
+        `Skipping seller quote reminder for ${order.id}: seller email missing`,
+      );
+      return;
+    }
+
+    await this.mailService.sendSellerQuoteReminderEmail(sellerEmail, {
+      orderReference: order.orderReference,
+      storeName: order.sellerProfile.storeName,
+    });
+  }
+
+  private async processBuyerQuoteReminder(
+    job: OrderNotificationJob,
+  ): Promise<void> {
+    const order = await this.getOrderForNotification(job.data.orderId);
+
+    if (order.status !== OrderStatus.QUOTE_SENT) {
+      return;
+    }
+
+    await this.mailService.sendBuyerQuoteResponseReminderEmail(
+      order.buyer.email,
+      {
+        orderReference: order.orderReference,
+        totalAmount: Number(order.totalAmount),
+        currency: order.currency,
+      },
+    );
+  }
+
+  private async logSystemCancellation(
+    orderId: string,
+    notes: string,
+    metadata: Record<string, unknown>,
+  ): Promise<void> {
+    await this.fulfilmentEventRepo.save(
+      this.fulfilmentEventRepo.create({
+        orderId,
+        type: FulfilmentEventType.CANCELLED,
+        actorId: 'system',
+        notes,
+        metadata,
+      }),
+    );
+  }
+
+  private async processAwaitingQuoteExpiry(
+    job: OrderNotificationJob,
+  ): Promise<void> {
+    const order = await this.getOrderForNotification(job.data.orderId);
+
+    if (order.status !== OrderStatus.AWAITING_DELIVERY_QUOTE) {
+      return;
+    }
+
+    await this.orderRepo.save({
+      ...order,
+      status: OrderStatus.CANCELLED,
+    });
+
+    await this.logSystemCancellation(
+      order.id,
+      'Order cancelled automatically because no delivery quote was sent before expiry.',
+      { reason: 'awaiting_delivery_quote_expired' },
+    );
+  }
+
+  private async processQuoteSentExpiry(
+    job: OrderNotificationJob,
+  ): Promise<void> {
+    const order = await this.getOrderForNotification(job.data.orderId);
+
+    if (order.status !== OrderStatus.QUOTE_SENT) {
+      return;
+    }
+
+    const latestQuote = await this.deliveryQuoteRepo.findOne({
+      where: { orderId: order.id },
+      order: { createdAt: 'DESC' },
+    });
+
+    if (latestQuote && latestQuote.status === QuoteStatus.SENT) {
+      await this.deliveryQuoteRepo.save({
+        ...latestQuote,
+        status: QuoteStatus.DECLINED,
+        respondedAt: new Date(),
+      });
+    }
+
+    await this.orderRepo.save({
+      ...order,
+      status: OrderStatus.CANCELLED,
+    });
+
+    await this.logSystemCancellation(
+      order.id,
+      'Order cancelled automatically because the delivery quote was not answered before expiry.',
+      { reason: 'quote_response_expired' },
+    );
+  }
+
   private async handleFailedJob(
     job: FailedOrderJob,
     error: Error,
@@ -168,6 +291,18 @@ export class OrdersProcessor implements OnModuleInit, OnModuleDestroy {
             return;
           case OrderJobName.SEND_QUOTE_RESPONSE_NOTIFICATION:
             await this.processQuoteResponse(job);
+            return;
+          case OrderJobName.SEND_SELLER_QUOTE_REMINDER:
+            await this.processSellerQuoteReminder(job);
+            return;
+          case OrderJobName.SEND_BUYER_QUOTE_RESPONSE_REMINDER:
+            await this.processBuyerQuoteReminder(job);
+            return;
+          case OrderJobName.EXPIRE_AWAITING_DELIVERY_QUOTE:
+            await this.processAwaitingQuoteExpiry(job);
+            return;
+          case OrderJobName.EXPIRE_QUOTE_SENT:
+            await this.processQuoteSentExpiry(job);
             return;
         }
       },

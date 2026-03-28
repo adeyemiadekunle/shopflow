@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Product } from '../catalog/entities/product.entity';
@@ -95,6 +96,21 @@ describe('OrdersService', () => {
     add: jest.fn(),
   };
 
+  const mockConfigService = {
+    get: jest.fn((key: string) => {
+      switch (key) {
+        case 'queue.sellerQuoteReminderDelayMs':
+        case 'queue.buyerQuoteReminderDelayMs':
+          return 1_800_000;
+        case 'queue.sellerQuoteExpiryDelayMs':
+        case 'queue.buyerQuoteExpiryDelayMs':
+          return 86_400_000;
+        default:
+          return undefined;
+      }
+    }),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -121,6 +137,7 @@ describe('OrdersService', () => {
           useValue: mockProductVariantRepo,
         },
         { provide: ORDERS_QUEUE, useValue: mockOrdersQueue },
+        { provide: ConfigService, useValue: mockConfigService },
         { provide: SellersService, useValue: mockSellersService },
       ],
     }).compile();
@@ -262,10 +279,29 @@ describe('OrdersService', () => {
     );
     expect(order.status).toBe(OrderStatus.AWAITING_DELIVERY_QUOTE);
     expect(mockEventRepo.save).toHaveBeenCalled();
-    expect(mockOrdersQueue.add).toHaveBeenCalledWith(
+    expect(mockOrdersQueue.add).toHaveBeenNthCalledWith(
+      1,
       'send-order-created-notification',
       { orderId: 'order-new' },
       { jobId: 'send-order-created-notification:order-new:na' },
+    );
+    expect(mockOrdersQueue.add).toHaveBeenNthCalledWith(
+      2,
+      'send-seller-quote-reminder',
+      { orderId: 'order-new' },
+      {
+        delay: 1800000,
+        jobId: 'send-seller-quote-reminder:order-new',
+      },
+    );
+    expect(mockOrdersQueue.add).toHaveBeenNthCalledWith(
+      3,
+      'expire-awaiting-delivery-quote',
+      { orderId: 'order-new' },
+      {
+        delay: 86400000,
+        jobId: 'expire-awaiting-delivery-quote:order-new',
+      },
     );
   });
 
@@ -301,10 +337,29 @@ describe('OrdersService', () => {
         status: QuoteStatus.SENT,
       }),
     );
-    expect(mockOrdersQueue.add).toHaveBeenCalledWith(
+    expect(mockOrdersQueue.add).toHaveBeenNthCalledWith(
+      1,
       'send-delivery-quote-notification',
       { orderId: 'order-1' },
       { jobId: 'send-delivery-quote-notification:order-1:na' },
+    );
+    expect(mockOrdersQueue.add).toHaveBeenNthCalledWith(
+      2,
+      'send-buyer-quote-response-reminder',
+      { orderId: 'order-1' },
+      {
+        delay: 1800000,
+        jobId: 'send-buyer-quote-response-reminder:order-1',
+      },
+    );
+    expect(mockOrdersQueue.add).toHaveBeenNthCalledWith(
+      3,
+      'expire-quote-sent',
+      { orderId: 'order-1' },
+      {
+        delay: 86400000,
+        jobId: 'expire-quote-sent:order-1',
+      },
     );
   });
 
@@ -338,6 +393,39 @@ describe('OrdersService', () => {
       'send-quote-response-notification',
       { orderId: 'order-1', accepted: true },
       { jobId: 'send-quote-response-notification:order-1:true' },
+    );
+  });
+
+  it('cancelByBuyer() should cancel pre-payment buyer orders', async () => {
+    mockOrderRepo.findOne.mockResolvedValueOnce({
+      ...mockOrder,
+      status: OrderStatus.QUOTE_ACCEPTED,
+    });
+    mockOrderRepo.findOne.mockResolvedValueOnce({
+      ...mockOrder,
+      status: OrderStatus.CANCELLED,
+    });
+
+    const order = await service.cancelByBuyer('buyer-1', 'order-1');
+
+    expect(order.status).toBe(OrderStatus.CANCELLED);
+    expect(mockOrderRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'order-1',
+        status: OrderStatus.CANCELLED,
+      }),
+    );
+    expect(mockEventRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderId: 'order-1',
+        type: FulfilmentEventType.CANCELLED,
+      }),
+    );
+  });
+
+  it('cancelByBuyer() should reject cancellation after payment', async () => {
+    await expect(service.cancelByBuyer('buyer-1', 'order-1')).rejects.toThrow(
+      BadRequestException,
     );
   });
 

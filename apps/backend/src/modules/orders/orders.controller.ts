@@ -64,6 +64,16 @@ export class OrdersController {
     return this.ordersService.respondToQuote(user.id, id, dto);
   }
 
+  @Post(':id/cancel')
+  @Roles(UserRole.BUYER)
+  @ApiOperation({ summary: 'Cancel an order before payment is confirmed' })
+  cancelOrder(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    return this.ordersService.cancelByBuyer(user.id, id);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get order by ID if the current user has access' })
   getOrder(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {

@@ -73,6 +73,21 @@ export class MailService {
     await this.sendOrLog(email, subject, text);
   }
 
+  async sendSellerQuoteReminderEmail(
+    email: string,
+    params: {
+      orderReference: string;
+      storeName: string;
+    },
+  ): Promise<void> {
+    const subject = `Reminder: send delivery quote for ${params.orderReference}`;
+    const text =
+      `Order ${params.orderReference} for ${params.storeName} is still awaiting a delivery quote.\n\n` +
+      'Open your seller dashboard to send the quote before the order expires automatically.';
+
+    await this.sendOrLog(email, subject, text);
+  }
+
   async sendBuyerDeliveryQuoteEmail(
     email: string,
     params: {
@@ -88,6 +103,23 @@ export class MailService {
       `Delivery fee: ${params.currency} ${params.feeAmount.toFixed(2)}\n` +
       `Updated buyer total: ${params.currency} ${params.totalAmount.toFixed(2)}\n\n` +
       'Open your buyer dashboard to accept or decline the quote.';
+
+    await this.sendOrLog(email, subject, text);
+  }
+
+  async sendBuyerQuoteResponseReminderEmail(
+    email: string,
+    params: {
+      orderReference: string;
+      totalAmount: number;
+      currency: string;
+    },
+  ): Promise<void> {
+    const subject = `Reminder: respond to quote for ${params.orderReference}`;
+    const text =
+      `Your order ${params.orderReference} is still waiting for your delivery quote response.\n\n` +
+      `Current buyer total: ${params.currency} ${params.totalAmount.toFixed(2)}\n\n` +
+      'Please accept or decline the quote before the order expires automatically.';
 
     await this.sendOrLog(email, subject, text);
   }

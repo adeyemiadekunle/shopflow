@@ -5,6 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
 import { In, Repository } from 'typeorm';
@@ -50,6 +51,7 @@ export class OrdersService {
     private readonly productVariantRepo: Repository<ProductVariant>,
     @Inject(ORDERS_QUEUE)
     private readonly ordersQueue: Queue,
+    private readonly config: ConfigService,
     private readonly sellersService: SellersService,
   ) {}
 
@@ -170,6 +172,21 @@ export class OrdersService {
     await this.ordersQueue.add(jobName, data, {
       jobId: `${jobName}:${data.orderId}:${data.accepted ?? 'na'}`,
     });
+  }
+
+  private async enqueueDelayedOrderJob(
+    jobName: OrderJobName,
+    orderId: string,
+    delay: number,
+  ): Promise<void> {
+    await this.ordersQueue.add(
+      jobName,
+      { orderId },
+      {
+        jobId: `${jobName}:${orderId}`,
+        delay,
+      },
+    );
   }
 
   async findById(id: string): Promise<Order> {
@@ -357,6 +374,16 @@ export class OrdersService {
       OrderJobName.SEND_ORDER_CREATED_NOTIFICATION,
       { orderId: order.id },
     );
+    await this.enqueueDelayedOrderJob(
+      OrderJobName.SEND_SELLER_QUOTE_REMINDER,
+      order.id,
+      this.config.get<number>('queue.sellerQuoteReminderDelayMs') ?? 1_800_000,
+    );
+    await this.enqueueDelayedOrderJob(
+      OrderJobName.EXPIRE_AWAITING_DELIVERY_QUOTE,
+      order.id,
+      this.config.get<number>('queue.sellerQuoteExpiryDelayMs') ?? 86_400_000,
+    );
 
     return this.findById(order.id);
   }
@@ -401,6 +428,16 @@ export class OrdersService {
     await this.enqueueOrderNotification(
       OrderJobName.SEND_DELIVERY_QUOTE_NOTIFICATION,
       { orderId },
+    );
+    await this.enqueueDelayedOrderJob(
+      OrderJobName.SEND_BUYER_QUOTE_RESPONSE_REMINDER,
+      orderId,
+      this.config.get<number>('queue.buyerQuoteReminderDelayMs') ?? 1_800_000,
+    );
+    await this.enqueueDelayedOrderJob(
+      OrderJobName.EXPIRE_QUOTE_SENT,
+      orderId,
+      this.config.get<number>('queue.buyerQuoteExpiryDelayMs') ?? 86_400_000,
     );
 
     return this.findById(orderId);
@@ -450,6 +487,49 @@ export class OrdersService {
     await this.enqueueOrderNotification(
       OrderJobName.SEND_QUOTE_RESPONSE_NOTIFICATION,
       { orderId, accepted: dto.accept },
+    );
+
+    return this.findById(orderId);
+  }
+
+  async cancelByBuyer(buyerId: string, orderId: string): Promise<Order> {
+    const order = await this.findById(orderId);
+
+    if (order.buyerId !== buyerId) {
+      throw new ForbiddenException('You can only cancel your own orders');
+    }
+
+    const cancellableStatuses: OrderStatus[] = [
+      OrderStatus.AWAITING_DELIVERY_QUOTE,
+      OrderStatus.QUOTE_SENT,
+      OrderStatus.QUOTE_ACCEPTED,
+      OrderStatus.PAYMENT_PENDING,
+    ];
+
+    if (!cancellableStatuses.includes(order.status)) {
+      throw new BadRequestException(
+        `Orders cannot be cancelled by the buyer once they reach status ${order.status}`,
+      );
+    }
+
+    if (order.status === OrderStatus.QUOTE_SENT) {
+      const latestQuote = await this.getLatestQuote(orderId);
+      if (latestQuote?.status === QuoteStatus.SENT) {
+        latestQuote.status = QuoteStatus.DECLINED;
+        latestQuote.respondedAt = new Date();
+        await this.deliveryQuoteRepo.save(latestQuote);
+      }
+    }
+
+    order.status = OrderStatus.CANCELLED;
+    await this.orderRepo.save(order);
+
+    await this.logEvent(
+      orderId,
+      FulfilmentEventType.CANCELLED,
+      buyerId,
+      'Order cancelled by buyer before payment confirmation.',
+      { cancelledBy: 'buyer' },
     );
 
     return this.findById(orderId);
