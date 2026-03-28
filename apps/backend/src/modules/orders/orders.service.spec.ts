@@ -7,7 +7,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Product } from '../catalog/entities/product.entity';
 import { ProductVariant } from '../catalog/entities/product-variant.entity';
-import { PlatformConfigService } from '../platform-config/platform-config.service';
 import { SellersService } from '../sellers/sellers.service';
 import { UserRole } from '../users/enums/user-role.enum';
 import { DeliveryQuote, QuoteStatus } from './entities/delivery-quote.entity';
@@ -33,8 +32,8 @@ describe('OrdersService', () => {
     status: OrderStatus.PAID,
     itemsTotal: 10000,
     deliveryFee: 500,
-    platformFee: 1000,
-    totalAmount: 11500,
+    platformFee: 0,
+    totalAmount: 10500,
     currency: 'NGN',
     deliveryAddress: { addressLine1: '12 Allen Avenue' },
     createdAt: new Date(),
@@ -91,10 +90,6 @@ describe('OrdersService', () => {
     getByUserIdOrThrow: jest.fn(),
   };
 
-  const mockPlatformConfigService = {
-    getDefaultCommissionRate: jest.fn().mockResolvedValue(10),
-  };
-
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -120,10 +115,6 @@ describe('OrdersService', () => {
           useValue: mockProductVariantRepo,
         },
         { provide: SellersService, useValue: mockSellersService },
-        {
-          provide: PlatformConfigService,
-          useValue: mockPlatformConfigService,
-        },
       ],
     }).compile();
 
@@ -224,8 +215,8 @@ describe('OrdersService', () => {
         sellerProfileId: 'seller-1',
         status: OrderStatus.AWAITING_DELIVERY_QUOTE,
         itemsTotal: 18000,
-        platformFee: 1800,
-        totalAmount: 19800,
+        platformFee: 0,
+        totalAmount: 18000,
         currency: 'NGN',
       })
       .mockResolvedValueOnce({
@@ -259,7 +250,7 @@ describe('OrdersService', () => {
         sellerProfileId: 'seller-1',
         status: OrderStatus.AWAITING_DELIVERY_QUOTE,
         itemsTotal: 18000,
-        platformFee: 1800,
+        platformFee: 0,
       }),
     );
     expect(order.status).toBe(OrderStatus.AWAITING_DELIVERY_QUOTE);
@@ -282,7 +273,7 @@ describe('OrdersService', () => {
       ...mockOrder,
       status: OrderStatus.QUOTE_SENT,
       deliveryFee: 2500,
-      totalAmount: 13500,
+      totalAmount: 12500,
     });
 
     const order = await service.sendDeliveryQuote('seller-user-1', 'order-1', {

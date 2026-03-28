@@ -13,7 +13,6 @@ import {
   ProductStatus,
 } from '../catalog/entities/product.entity';
 import { ProductVariant } from '../catalog/entities/product-variant.entity';
-import { PlatformConfigService } from '../platform-config/platform-config.service';
 import { SellersService } from '../sellers/sellers.service';
 import { UserRole } from '../users/enums/user-role.enum';
 import {
@@ -47,7 +46,6 @@ export class OrdersService {
     @InjectRepository(ProductVariant)
     private readonly productVariantRepo: Repository<ProductVariant>,
     private readonly sellersService: SellersService,
-    private readonly platformConfigService: PlatformConfigService,
   ) {}
 
   generateReference(): string {
@@ -311,12 +309,6 @@ export class OrdersService {
       });
     });
 
-    const commissionRate =
-      await this.platformConfigService.getDefaultCommissionRate();
-    const platformFee = Number(
-      ((itemsTotal * commissionRate) / 100).toFixed(2),
-    );
-
     const orderEntity = this.orderRepo.create({
       orderReference,
       buyerId,
@@ -324,8 +316,8 @@ export class OrdersService {
       status: OrderStatus.AWAITING_DELIVERY_QUOTE,
       itemsTotal,
       deliveryFee: 0,
-      platformFee,
-      totalAmount: Number((itemsTotal + platformFee).toFixed(2)),
+      platformFee: 0,
+      totalAmount: Number(itemsTotal.toFixed(2)),
       currency,
       deliveryAddress: dto.deliveryAddress
         ? ({ ...dto.deliveryAddress } as Record<string, unknown>)
@@ -343,7 +335,7 @@ export class OrdersService {
       {
         itemCount: items.length,
         itemsTotal,
-        platformFee,
+        buyerPayableAmount: Number(itemsTotal.toFixed(2)),
       },
     );
 
@@ -374,11 +366,7 @@ export class OrdersService {
 
     order.deliveryFee = dto.feeAmount;
     order.totalAmount = Number(
-      (
-        Number(order.itemsTotal) +
-        Number(order.platformFee) +
-        dto.feeAmount
-      ).toFixed(2),
+      (Number(order.itemsTotal) + dto.feeAmount).toFixed(2),
     );
     order.status = OrderStatus.QUOTE_SENT;
 

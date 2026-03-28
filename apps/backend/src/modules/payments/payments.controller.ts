@@ -75,7 +75,6 @@ export class PaymentsController {
       return { received: false };
     }
 
-    await this.paymentsService.processWebhook(body);
-    return { received: true };
+    return this.paymentsService.enqueueWebhook(body);
   }
 }
