@@ -7,6 +7,10 @@ import { FulfilmentEvent } from './entities/fulfilment-event.entity';
 import { DisputeCase } from './entities/dispute-case.entity';
 import { OrdersService } from './orders.service';
 import { OrdersController } from './orders.controller';
+import { Product } from '../catalog/entities/product.entity';
+import { ProductVariant } from '../catalog/entities/product-variant.entity';
+import { SellersModule } from '../sellers/sellers.module';
+import { PlatformConfigModule } from '../platform-config/platform-config.module';
 
 @Module({
   imports: [
@@ -16,7 +20,11 @@ import { OrdersController } from './orders.controller';
       DeliveryQuote,
       FulfilmentEvent,
       DisputeCase,
+      Product,
+      ProductVariant,
     ]),
+    SellersModule,
+    PlatformConfigModule,
   ],
   providers: [OrdersService],
   controllers: [OrdersController],
