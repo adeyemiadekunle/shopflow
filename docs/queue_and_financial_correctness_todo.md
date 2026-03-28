@@ -36,20 +36,20 @@ What is still missing is the production-grade async and correctness layer around
 - [x] Add worker registration pattern for NestJS
 - [x] Add retry/backoff defaults
 - [x] Add dead-letter queue strategy
-- [ ] Add queue health/metrics visibility
-- [ ] Document local queue setup in README
+- [x] Add queue health/metrics visibility
+- [x] Document local queue setup in README
 
 ## Phase B: Payments Queue
 
 - [x] Move Paystack webhook processing off the request thread
 - [x] Persist webhook event first, enqueue processing second
 - [x] Add `payments` worker for payment intent verification
-- [ ] Make payment verification idempotent by `paystackReference`
-- [ ] Make webhook processing idempotent by event/reference
-- [ ] Prevent double payment state transitions on repeated webhook delivery
-- [ ] Prevent double order payment confirmation on repeated verify calls
-- [ ] Add explicit handling for `charge.success`
-- [ ] Add explicit handling for `charge.failed`
+- [x] Make payment verification idempotent by `paystackReference`
+- [x] Make webhook processing idempotent by event/reference
+- [x] Prevent double payment state transitions on repeated webhook delivery
+- [x] Prevent double order payment confirmation on repeated verify calls
+- [x] Add explicit handling for `charge.success`
+- [x] Add explicit handling for `charge.failed`
 - [ ] Add retry + backoff policy for verification failures
 - [ ] Add DLQ path for repeated payment job failures
 
@@ -96,8 +96,8 @@ What is still missing is the production-grade async and correctness layer around
 
 ## Phase G: Observability and Safety
 
-- [ ] Add queue dashboards or metrics
-- [ ] Track job success/failure counts
+- [x] Add queue dashboards or metrics
+- [x] Track job success/failure counts
 - [ ] Track retry counts and DLQ counts
 - [ ] Add alerts for stuck workers
 - [ ] Add alerts for webhook backlog growth
@@ -132,6 +132,10 @@ What is still missing is the production-grade async and correctness layer around
 - [x] Queue layer started
 - [x] Orders notification queue started
 - [x] Orders reminder and expiry queue started
+- [x] Queue summary health endpoint added
+- [x] Queue Grafana dashboard provisioning added
+- [x] API and payments Grafana dashboard provisioning added
+- [x] Payment idempotency hardening added
 - [ ] Ledger posting on payment success not connected
 - [ ] Reconciliation not implemented
 - [ ] DLQ and worker monitoring not implemented

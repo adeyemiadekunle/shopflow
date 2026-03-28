@@ -350,6 +350,31 @@ JWT auth via `auth.token` in the Socket.IO handshake.
 
 Database and memory health checks via `@nestjs/terminus`.
 
+### Queue Health — `/health/queues`
+
+Public queue backlog summary for operational visibility across:
+
+- `payments`
+- `orders`
+- `dead-letter`
+
+Each queue returns counts for `waiting`, `active`, `completed`, `failed`, `delayed`, and `paused`.
+
+Queue monitoring is also pre-provisioned in Grafana as the `Queue Monitoring` dashboard under the `Rands` folder. It visualises:
+
+- payment queue waiting and failed jobs
+- delayed order jobs
+- dead-letter backlog
+- queue jobs grouped by queue and status
+
+Grafana also preloads an `API and Payments Overview` dashboard under the same `Rands` folder. It visualises:
+
+- API target health
+- process memory and CPU pressure
+- event loop lag
+- payment queue pressure and backlog trends
+- live backend logs from Loki
+
 ---
 
 ## Platform Config
@@ -433,6 +458,7 @@ docker compose up -d
 # Services
 # API        → http://localhost:3000
 # Health     → http://localhost:3000/health
+# Queues     → http://localhost:3000/health/queues
 # Metrics    → http://localhost:3000/api/v1/metrics
 # Swagger    → http://localhost:3000/api-docs
 # Grafana    → http://localhost:3001
@@ -443,6 +469,11 @@ docker compose up -d
 Grafana local login:
 - Username: `admin`
 - Password: `admin`
+
+Grafana dashboards:
+- Folder: `Rands`
+- Dashboard: `Queue Monitoring`
+- Dashboard: `API and Payments Overview`
 
 The Docker Compose stack includes:
 

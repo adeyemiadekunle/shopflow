@@ -20,7 +20,7 @@ async function bootstrap() {
   app.useLogger(app.get(Logger));
 
   // ── Global prefix ───────────────────────────────────────────────────
-  app.setGlobalPrefix('api/v1', { exclude: ['health'] });
+  app.setGlobalPrefix('api/v1', { exclude: ['health', 'health/queues'] });
 
   // ── CORS ────────────────────────────────────────────────────────────
   app.enableCors({ origin: corsOrigins, credentials: true });
