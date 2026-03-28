@@ -41,6 +41,8 @@ import { DeliveryQuote } from './modules/orders/entities/delivery-quote.entity';
 import { FulfilmentEvent } from './modules/orders/entities/fulfilment-event.entity';
 import { DisputeCase } from './modules/orders/entities/dispute-case.entity';
 import { PaymentIntent } from './modules/payments/entities/payment-intent.entity';
+import { PaymentReconciliationIssue } from './modules/payments/entities/payment-reconciliation-issue.entity';
+import { PaymentReconciliationRun } from './modules/payments/entities/payment-reconciliation-run.entity';
 import { WebhookEvent } from './modules/payments/entities/webhook-event.entity';
 import { LedgerAccount } from './modules/ledger/entities/ledger-account.entity';
 import { LedgerEntry } from './modules/ledger/entities/ledger-entry.entity';
@@ -114,6 +116,8 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
           FulfilmentEvent,
           DisputeCase,
           PaymentIntent,
+          PaymentReconciliationRun,
+          PaymentReconciliationIssue,
           WebhookEvent,
           LedgerAccount,
           LedgerEntry,

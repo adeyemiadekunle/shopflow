@@ -9,6 +9,7 @@ export enum QueueName {
 
 export enum PaymentJobName {
   PROCESS_WEBHOOK_EVENT = 'process-webhook-event',
+  RUN_PAYMENT_RECONCILIATION = 'run-payment-reconciliation',
 }
 
 export enum OrderJobName {

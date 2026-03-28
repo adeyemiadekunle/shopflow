@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { FulfilmentEvent } from '../orders/entities/fulfilment-event.entity';
 import { Order } from '../orders/entities/order.entity';
@@ -14,6 +15,16 @@ import {
   PaymentIntent,
   PaymentIntentStatus,
 } from './entities/payment-intent.entity';
+import {
+  PaymentReconciliationIssue,
+  PaymentReconciliationIssueSeverity,
+  PaymentReconciliationIssueStatus,
+  PaymentReconciliationIssueType,
+} from './entities/payment-reconciliation-issue.entity';
+import {
+  PaymentReconciliationRun,
+  PaymentReconciliationRunStatus,
+} from './entities/payment-reconciliation-run.entity';
 import { WebhookEvent } from './entities/webhook-event.entity';
 import { PaymentsService } from './payments.service';
 import { PaystackService } from './paystack.service';
@@ -23,6 +34,7 @@ describe('PaymentsService', () => {
 
   const mockPaymentIntentRepo = {
     findOne: jest.fn(),
+    find: jest.fn(),
     save: jest
       .fn()
       .mockImplementation((value: Record<string, unknown>) =>
@@ -35,6 +47,33 @@ describe('PaymentsService', () => {
 
   const mockWebhookRepo = {
     findOne: jest.fn(),
+    save: jest
+      .fn()
+      .mockImplementation((value: Record<string, unknown>) =>
+        Promise.resolve(value),
+      ),
+    create: jest
+      .fn()
+      .mockImplementation((value: Record<string, unknown>) => value),
+  };
+
+  const mockReconciliationRunRepo = {
+    findOne: jest.fn(),
+    find: jest.fn(),
+    save: jest
+      .fn()
+      .mockImplementation((value: Record<string, unknown>) =>
+        Promise.resolve(value),
+      ),
+    create: jest
+      .fn()
+      .mockImplementation((value: Record<string, unknown>) => value),
+  };
+
+  const mockReconciliationIssueRepo = {
+    findOne: jest.fn(),
+    find: jest.fn(),
+    count: jest.fn(),
     save: jest
       .fn()
       .mockImplementation((value: Record<string, unknown>) =>
@@ -74,6 +113,21 @@ describe('PaymentsService', () => {
     findById: jest.fn(),
   };
 
+  const mockConfigService = {
+    get: jest.fn((key: string) => {
+      switch (key) {
+        case 'queue.paymentsReconciliationIntervalMs':
+          return 900000;
+        case 'queue.paymentsReconciliationMinAgeMs':
+          return 600000;
+        case 'queue.paymentsReconciliationBatchSize':
+          return 100;
+        default:
+          return undefined;
+      }
+    }),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -89,6 +143,14 @@ describe('PaymentsService', () => {
           useValue: mockWebhookRepo,
         },
         {
+          provide: getRepositoryToken(PaymentReconciliationRun),
+          useValue: mockReconciliationRunRepo,
+        },
+        {
+          provide: getRepositoryToken(PaymentReconciliationIssue),
+          useValue: mockReconciliationIssueRepo,
+        },
+        {
           provide: getRepositoryToken(Order),
           useValue: mockOrderRepo,
         },
@@ -97,6 +159,7 @@ describe('PaymentsService', () => {
           useValue: mockFulfilmentEventRepo,
         },
         { provide: PAYMENTS_QUEUE, useValue: mockPaymentsQueue },
+        { provide: ConfigService, useValue: mockConfigService },
         { provide: PaystackService, useValue: mockPaystackService },
         { provide: UsersService, useValue: mockUsersService },
       ],
@@ -414,6 +477,149 @@ describe('PaymentsService', () => {
       expect.objectContaining({
         id: 'webhook-1',
         processed: true,
+      }),
+    );
+  });
+
+  it('enqueueReconciliationRun() should queue a manual reconciliation job', async () => {
+    mockPaymentsQueue.add.mockResolvedValue({});
+
+    const result = await service.enqueueReconciliationRun(
+      'manual',
+      'admin-1',
+      true,
+    );
+
+    expect(mockPaymentsQueue.add).toHaveBeenCalledWith(
+      'run-payment-reconciliation',
+      {
+        trigger: 'manual',
+        initiatedByUserId: 'admin-1',
+      },
+      expect.objectContaining({
+        jobId: expect.stringContaining('payment-reconciliation:manual:'),
+      }),
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        queued: true,
+        trigger: 'manual',
+      }),
+    );
+  });
+
+  it('processReconciliationJob() should repair a succeeded payment whose order is still payment_pending', async () => {
+    mockReconciliationRunRepo.save
+      .mockResolvedValueOnce({
+        id: 'run-1',
+        status: PaymentReconciliationRunStatus.STARTED,
+        startedAt: new Date('2026-03-28T12:00:00.000Z'),
+      })
+      .mockImplementation((value: Record<string, unknown>) =>
+        Promise.resolve(value),
+      );
+    mockPaymentIntentRepo.find.mockResolvedValue([
+      {
+        id: 'intent-1',
+        orderId: 'order-1',
+        buyerId: 'buyer-1',
+        paystackReference: 'PAY-RND-100-TESTREF',
+        amountKobo: 1980000,
+        currency: 'NGN',
+        status: PaymentIntentStatus.SUCCEEDED,
+        updatedAt: new Date('2026-03-28T10:00:00.000Z'),
+        rawVerifyPayload: {
+          status: 'success',
+          reference: 'PAY-RND-100-TESTREF',
+          amount: 1980000,
+          currency: 'NGN',
+          paid_at: '2026-03-28T10:05:00.000Z',
+          channel: 'card',
+          metadata: {},
+          authorization: {
+            authorization_code: 'AUTH_CODE',
+            card_type: 'visa',
+            last4: '4081',
+            bank: 'Test Bank',
+          },
+        },
+      },
+    ]);
+    mockOrderRepo.findOne.mockResolvedValue({
+      id: 'order-1',
+      buyerId: 'buyer-1',
+      status: OrderStatus.PAYMENT_PENDING,
+    });
+    mockReconciliationIssueRepo.findOne.mockResolvedValue(null);
+    mockReconciliationIssueRepo.count.mockResolvedValue(0);
+
+    const result = await service.processReconciliationJob({
+      trigger: 'scheduled',
+    });
+
+    expect(mockOrderRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'order-1',
+        status: OrderStatus.PAID,
+      }),
+    );
+    expect(mockFulfilmentEventRepo.save).toHaveBeenCalled();
+    expect(result).toEqual(
+      expect.objectContaining({
+        repairedCount: 1,
+        issueCount: 1,
+        status: PaymentReconciliationRunStatus.COMPLETED_WITH_ISSUES,
+      }),
+    );
+  });
+
+  it('processReconciliationJob() should record an open issue for failed intents attached to paid orders', async () => {
+    mockReconciliationRunRepo.save
+      .mockResolvedValueOnce({
+        id: 'run-2',
+        status: PaymentReconciliationRunStatus.STARTED,
+        startedAt: new Date('2026-03-28T12:00:00.000Z'),
+      })
+      .mockImplementation((value: Record<string, unknown>) =>
+        Promise.resolve(value),
+      );
+    mockPaymentIntentRepo.find.mockResolvedValue([
+      {
+        id: 'intent-2',
+        orderId: 'order-2',
+        buyerId: 'buyer-1',
+        paystackReference: 'PAY-RND-200-TESTREF',
+        amountKobo: 250000,
+        currency: 'NGN',
+        status: PaymentIntentStatus.FAILED,
+        updatedAt: new Date('2026-03-28T10:00:00.000Z'),
+      },
+    ]);
+    mockOrderRepo.findOne.mockResolvedValue({
+      id: 'order-2',
+      buyerId: 'buyer-1',
+      status: OrderStatus.PAID,
+    });
+    mockReconciliationIssueRepo.findOne.mockResolvedValue(null);
+    mockReconciliationIssueRepo.count.mockResolvedValue(0);
+
+    const result = await service.processReconciliationJob({
+      trigger: 'manual',
+      initiatedByUserId: 'admin-1',
+    });
+
+    expect(mockReconciliationIssueRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: PaymentReconciliationIssueType.FAILED_ORDER_MARKED_PAID,
+        severity: PaymentReconciliationIssueSeverity.ERROR,
+        status: PaymentReconciliationIssueStatus.OPEN,
+      }),
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        issueCount: 1,
+        repairedCount: 0,
+        status: PaymentReconciliationRunStatus.COMPLETED_WITH_ISSUES,
       }),
     );
   });

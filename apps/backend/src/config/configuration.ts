@@ -80,6 +80,18 @@ export default () => ({
       process.env['QUEUE_BUYER_QUOTE_EXPIRY_DELAY_MS'] ?? '86400000',
       10,
     ),
+    paymentsReconciliationIntervalMs: parseInt(
+      process.env['QUEUE_PAYMENTS_RECONCILIATION_INTERVAL_MS'] ?? '900000',
+      10,
+    ),
+    paymentsReconciliationMinAgeMs: parseInt(
+      process.env['QUEUE_PAYMENTS_RECONCILIATION_MIN_AGE_MS'] ?? '600000',
+      10,
+    ),
+    paymentsReconciliationBatchSize: parseInt(
+      process.env['QUEUE_PAYMENTS_RECONCILIATION_BATCH_SIZE'] ?? '100',
+      10,
+    ),
     removeOnCompleteAgeSeconds: parseInt(
       process.env['QUEUE_REMOVE_ON_COMPLETE_AGE_SECONDS'] ?? '86400',
       10,

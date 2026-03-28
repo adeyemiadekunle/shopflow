@@ -66,14 +66,14 @@ What is still missing is the production-grade async and correctness layer around
 
 ## Phase D: Reconciliation
 
-- [ ] Add scheduled reconciliation job for payment intents
-- [ ] Compare Paystack transaction state vs payment intent state
-- [ ] Compare payment intent state vs order state
+- [x] Add scheduled reconciliation job for payment intents
+- [x] Compare Paystack transaction state vs payment intent state
+- [x] Compare payment intent state vs order state
 - [ ] Compare payment intent state vs ledger state
-- [ ] Flag stuck `processing` or `pending` intents
-- [ ] Add safe repair actions for recoverable mismatches
-- [ ] Log non-recoverable mismatches for manual review
-- [ ] Add admin/internal reporting endpoint for reconciliation results
+- [x] Flag stuck `processing` or `pending` intents
+- [x] Add safe repair actions for recoverable mismatches
+- [x] Log non-recoverable mismatches for manual review
+- [x] Add admin/internal reporting endpoint for reconciliation results
 
 ## Phase E: Orders Queue
 
@@ -135,7 +135,8 @@ What is still missing is the production-grade async and correctness layer around
 - [x] Queue summary health endpoint added
 - [x] Queue Grafana dashboard provisioning added
 - [x] API and payments Grafana dashboard provisioning added
+- [x] Payment reconciliation dashboards added
 - [x] Payment idempotency hardening added
 - [ ] Ledger posting on payment success not connected
-- [ ] Reconciliation not implemented
+- [ ] Ledger-aware reconciliation not implemented
 - [ ] DLQ and worker monitoring not implemented

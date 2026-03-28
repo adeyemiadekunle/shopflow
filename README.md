@@ -227,6 +227,9 @@ Current payment routes:
 |---|---|---|---|
 | POST | `/payments/checkout/:orderId` | Buyer | Initialize Paystack Checkout and return `authorizationUrl` |
 | POST | `/payments/verify` | Buyer/Admin | Verify a Paystack transaction by reference |
+| POST | `/payments/reconciliation/run` | Admin | Queue an immediate payment reconciliation run |
+| GET | `/payments/reconciliation/runs` | Admin | List recent payment reconciliation runs |
+| GET | `/payments/reconciliation/issues` | Admin | List recent payment reconciliation issues |
 | POST | `/payments/webhook` | Public | Paystack webhook receiver |
 
 ### Frontend Checkout Flow
@@ -373,6 +376,7 @@ Grafana also preloads an `API and Payments Overview` dashboard under the same `R
 - process memory and CPU pressure
 - event loop lag
 - payment queue pressure and backlog trends
+- reconciliation drift and open errors
 - live backend logs from Loki
 
 ---

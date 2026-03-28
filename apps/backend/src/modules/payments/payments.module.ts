@@ -13,6 +13,8 @@ import {
 } from '../queue/queue.constants';
 import { UsersModule } from '../users/users.module';
 import { PaymentIntent } from './entities/payment-intent.entity';
+import { PaymentReconciliationIssue } from './entities/payment-reconciliation-issue.entity';
+import { PaymentReconciliationRun } from './entities/payment-reconciliation-run.entity';
 import { WebhookEvent } from './entities/webhook-event.entity';
 import { PaystackService } from './paystack.service';
 import { PaymentsController } from './payments.controller';
@@ -26,6 +28,8 @@ type QueueConnectionOptions = NonNullable<QueueOptions['connection']>;
     QueueModule,
     TypeOrmModule.forFeature([
       PaymentIntent,
+      PaymentReconciliationRun,
+      PaymentReconciliationIssue,
       WebhookEvent,
       Order,
       FulfilmentEvent,
