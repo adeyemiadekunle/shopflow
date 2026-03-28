@@ -1,10 +1,12 @@
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { Queue } from 'bullmq';
 import { In, Repository } from 'typeorm';
 import { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import {
@@ -13,6 +15,7 @@ import {
   ProductStatus,
 } from '../catalog/entities/product.entity';
 import { ProductVariant } from '../catalog/entities/product-variant.entity';
+import { ORDERS_QUEUE, OrderJobName } from '../queue/queue.constants';
 import { SellersService } from '../sellers/sellers.service';
 import { UserRole } from '../users/enums/user-role.enum';
 import {
@@ -45,6 +48,8 @@ export class OrdersService {
     private readonly productRepo: Repository<Product>,
     @InjectRepository(ProductVariant)
     private readonly productVariantRepo: Repository<ProductVariant>,
+    @Inject(ORDERS_QUEUE)
+    private readonly ordersQueue: Queue,
     private readonly sellersService: SellersService,
   ) {}
 
@@ -155,6 +160,15 @@ export class OrdersService {
     return this.deliveryQuoteRepo.findOne({
       where: { orderId },
       order: { createdAt: 'DESC' },
+    });
+  }
+
+  private async enqueueOrderNotification(
+    jobName: OrderJobName,
+    data: { orderId: string; accepted?: boolean },
+  ): Promise<void> {
+    await this.ordersQueue.add(jobName, data, {
+      jobId: `${jobName}:${data.orderId}:${data.accepted ?? 'na'}`,
     });
   }
 
@@ -339,6 +353,11 @@ export class OrdersService {
       },
     );
 
+    await this.enqueueOrderNotification(
+      OrderJobName.SEND_ORDER_CREATED_NOTIFICATION,
+      { orderId: order.id },
+    );
+
     return this.findById(order.id);
   }
 
@@ -377,6 +396,11 @@ export class OrdersService {
       sellerUserId,
       dto.sellerNote?.trim(),
       { quoteId: quote.id, feeAmount: dto.feeAmount },
+    );
+
+    await this.enqueueOrderNotification(
+      OrderJobName.SEND_DELIVERY_QUOTE_NOTIFICATION,
+      { orderId },
     );
 
     return this.findById(orderId);
@@ -421,6 +445,11 @@ export class OrdersService {
       buyerId,
       undefined,
       { quoteId: quote.id },
+    );
+
+    await this.enqueueOrderNotification(
+      OrderJobName.SEND_QUOTE_RESPONSE_NOTIFICATION,
+      { orderId, accepted: dto.accept },
     );
 
     return this.findById(orderId);

@@ -7,6 +7,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Product } from '../catalog/entities/product.entity';
 import { ProductVariant } from '../catalog/entities/product-variant.entity';
+import { ORDERS_QUEUE } from '../queue/queue.constants';
 import { SellersService } from '../sellers/sellers.service';
 import { UserRole } from '../users/enums/user-role.enum';
 import { DeliveryQuote, QuoteStatus } from './entities/delivery-quote.entity';
@@ -90,11 +91,16 @@ describe('OrdersService', () => {
     getByUserIdOrThrow: jest.fn(),
   };
 
+  const mockOrdersQueue = {
+    add: jest.fn(),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
     mockOrderRepo.findOne.mockResolvedValue(mockOrder);
     mockOrderRepo.find.mockResolvedValue([mockOrder]);
+    mockOrdersQueue.add.mockResolvedValue({});
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -114,6 +120,7 @@ describe('OrdersService', () => {
           provide: getRepositoryToken(ProductVariant),
           useValue: mockProductVariantRepo,
         },
+        { provide: ORDERS_QUEUE, useValue: mockOrdersQueue },
         { provide: SellersService, useValue: mockSellersService },
       ],
     }).compile();
@@ -255,6 +262,11 @@ describe('OrdersService', () => {
     );
     expect(order.status).toBe(OrderStatus.AWAITING_DELIVERY_QUOTE);
     expect(mockEventRepo.save).toHaveBeenCalled();
+    expect(mockOrdersQueue.add).toHaveBeenCalledWith(
+      'send-order-created-notification',
+      { orderId: 'order-new' },
+      { jobId: 'send-order-created-notification:order-new:na' },
+    );
   });
 
   it('sendDeliveryQuote() should update the order total and quote status', async () => {
@@ -289,6 +301,11 @@ describe('OrdersService', () => {
         status: QuoteStatus.SENT,
       }),
     );
+    expect(mockOrdersQueue.add).toHaveBeenCalledWith(
+      'send-delivery-quote-notification',
+      { orderId: 'order-1' },
+      { jobId: 'send-delivery-quote-notification:order-1:na' },
+    );
   });
 
   it('respondToQuote() should accept the latest quote for the buyer order', async () => {
@@ -316,6 +333,11 @@ describe('OrdersService', () => {
         id: 'quote-1',
         status: QuoteStatus.ACCEPTED,
       }),
+    );
+    expect(mockOrdersQueue.add).toHaveBeenCalledWith(
+      'send-quote-response-notification',
+      { orderId: 'order-1', accepted: true },
+      { jobId: 'send-quote-response-notification:order-1:true' },
     );
   });
 

@@ -54,6 +54,61 @@ export class MailService {
     await this.sendOrLog(email, subject, text);
   }
 
+  async sendSellerOrderCreatedEmail(
+    email: string,
+    params: {
+      orderReference: string;
+      storeName: string;
+      totalAmount: number;
+      currency: string;
+    },
+  ): Promise<void> {
+    const subject = `New order received: ${params.orderReference}`;
+    const text =
+      `A new order has been created for ${params.storeName}.\n\n` +
+      `Order reference: ${params.orderReference}\n` +
+      `Buyer payable total: ${params.currency} ${params.totalAmount.toFixed(2)}\n\n` +
+      'Open your seller dashboard to review the order and send a delivery quote.';
+
+    await this.sendOrLog(email, subject, text);
+  }
+
+  async sendBuyerDeliveryQuoteEmail(
+    email: string,
+    params: {
+      orderReference: string;
+      feeAmount: number;
+      totalAmount: number;
+      currency: string;
+    },
+  ): Promise<void> {
+    const subject = `Delivery quote ready for ${params.orderReference}`;
+    const text =
+      `A delivery quote is now available for your order ${params.orderReference}.\n\n` +
+      `Delivery fee: ${params.currency} ${params.feeAmount.toFixed(2)}\n` +
+      `Updated buyer total: ${params.currency} ${params.totalAmount.toFixed(2)}\n\n` +
+      'Open your buyer dashboard to accept or decline the quote.';
+
+    await this.sendOrLog(email, subject, text);
+  }
+
+  async sendSellerQuoteResponseEmail(
+    email: string,
+    params: {
+      orderReference: string;
+      accepted: boolean;
+    },
+  ): Promise<void> {
+    const subject = `Buyer ${params.accepted ? 'accepted' : 'declined'} quote for ${params.orderReference}`;
+    const text =
+      `The buyer has ${params.accepted ? 'accepted' : 'declined'} the delivery quote for order ${params.orderReference}.\n\n` +
+      (params.accepted
+        ? 'You can now continue preparing the order for payment confirmation and fulfilment.'
+        : 'You can review the order and decide whether to follow up with the buyer.');
+
+    await this.sendOrLog(email, subject, text);
+  }
+
   private async sendOrLog(
     to: string,
     subject: string,

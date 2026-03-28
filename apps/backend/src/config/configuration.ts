@@ -60,6 +60,10 @@ export default () => ({
       process.env['QUEUE_PAYMENTS_CONCURRENCY'] ?? '5',
       10,
     ),
+    ordersConcurrency: parseInt(
+      process.env['QUEUE_ORDERS_CONCURRENCY'] ?? '5',
+      10,
+    ),
     removeOnCompleteAgeSeconds: parseInt(
       process.env['QUEUE_REMOVE_ON_COMPLETE_AGE_SECONDS'] ?? '86400',
       10,

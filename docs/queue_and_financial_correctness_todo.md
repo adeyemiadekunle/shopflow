@@ -77,9 +77,10 @@ What is still missing is the production-grade async and correctness layer around
 
 ## Phase E: Orders Queue
 
-- [ ] Queue non-critical order side-effects after order creation
-- [ ] Queue seller notifications after buyer creates order
-- [ ] Queue buyer notifications after seller sends quote
+- [x] Queue non-critical order side-effects after order creation
+- [x] Queue seller notifications after buyer creates order
+- [x] Queue buyer notifications after seller sends quote
+- [x] Queue seller notifications after buyer responds to quote
 - [ ] Queue reminder jobs for stale quotes
 - [ ] Queue expiry/cancellation jobs for abandoned quote states
 - [ ] Queue analytics/event fanout for order milestones
@@ -129,6 +130,7 @@ What is still missing is the production-grade async and correctness layer around
 - [x] Order checkout flow exists
 - [x] Paystack Checkout init and verify endpoints exist
 - [x] Queue layer started
+- [x] Orders notification queue started
 - [ ] Ledger posting on payment success not connected
 - [ ] Reconciliation not implemented
 - [ ] DLQ and worker monitoring not implemented
