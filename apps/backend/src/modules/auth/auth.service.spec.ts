@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ForbiddenException } from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
@@ -108,6 +108,42 @@ describe('AuthService', () => {
     await expect(
       service.login({ email: mockUser.email, password }),
     ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('register() should reject duplicate emails case-insensitively', async () => {
+    mockUsersService.findByEmail.mockResolvedValue(mockUser);
+
+    await expect(
+      service.register({
+        email: 'Buyer@Example.com',
+        password: 'SecurePass123!',
+        role: UserRole.BUYER,
+      }),
+    ).rejects.toThrow(ConflictException);
+
+    expect(mockUsersService.findByEmail).toHaveBeenCalledWith(
+      'buyer@example.com',
+    );
+  });
+
+  it('login() should normalize the email before lookup', async () => {
+    const password = 'SecurePass123!';
+    const passwordHash = await bcrypt.hash(password, 12);
+
+    mockUsersService.findByEmailWithTokenHash.mockResolvedValue({
+      ...mockUser,
+      passwordHash,
+    });
+    mockUsersService.save.mockResolvedValue(undefined);
+
+    await service.login({
+      email: 'Buyer@Example.com',
+      password,
+    });
+
+    expect(mockUsersService.findByEmailWithTokenHash).toHaveBeenCalledWith(
+      'buyer@example.com',
+    );
   });
 
   it('verifyEmail() should verify a valid token and clear verification fields', async () => {
