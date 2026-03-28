@@ -1,8 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
-import * as jwt from 'jsonwebtoken';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { UserRole } from '../users/enums/user-role.enum';
@@ -27,7 +26,7 @@ describe('AuthService', () => {
     findByIdWithTokenHash: jest.fn(),
     findById: jest.fn(),
     save: jest.fn(),
-    create: jest.fn((value) => value),
+    create: jest.fn((value: Record<string, unknown>) => ({ ...value })),
   };
 
   const mockConfigService = {
@@ -62,14 +61,8 @@ describe('AuthService', () => {
     service = module.get<AuthService>(AuthService);
   });
 
-  it('refresh() should rotate tokens for a valid refresh token', async () => {
-    const refreshToken = jwt.sign(
-      { sub: mockUser.id },
-      mockConfigService.get('jwt.refreshSecret'),
-      {
-        expiresIn: '7d',
-      },
-    );
+  it('refreshTokens() should rotate tokens for a valid refresh token', async () => {
+    const refreshToken = 'valid-refresh-token';
     const refreshTokenHash = await bcrypt.hash(refreshToken, 12);
 
     mockUsersService.findByIdWithTokenHash.mockResolvedValue({
@@ -78,7 +71,7 @@ describe('AuthService', () => {
     });
     mockUsersService.save.mockResolvedValue(undefined);
 
-    const result = await service.refresh({ refreshToken });
+    const result = await service.refreshTokens(mockUser.id, refreshToken);
 
     expect(result.accessToken).toBeDefined();
     expect(result.refreshToken).toBeDefined();
@@ -89,10 +82,17 @@ describe('AuthService', () => {
     );
   });
 
-  it('refresh() should throw UnauthorizedException for an invalid JWT', async () => {
+  it('refreshTokens() should reject a refresh token that does not match the stored hash', async () => {
+    const refreshTokenHash = await bcrypt.hash('different-refresh-token', 12);
+
+    mockUsersService.findByIdWithTokenHash.mockResolvedValue({
+      ...mockUser,
+      refreshTokenHash,
+    });
+
     await expect(
-      service.refresh({ refreshToken: 'not-a-valid-jwt' }),
-    ).rejects.toThrow(UnauthorizedException);
+      service.refreshTokens(mockUser.id, 'not-a-valid-jwt'),
+    ).rejects.toThrow(ForbiddenException);
   });
 
   it('login() should reject non-admin users with unverified email', async () => {

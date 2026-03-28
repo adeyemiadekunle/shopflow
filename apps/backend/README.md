@@ -62,7 +62,7 @@ Copy `.env.example` to `.env` and fill in:
 
 | Module | Base path | Description |
 |---|---|---|
-| auth | `/auth` | Register, login, refresh, email verification, password reset, admin creation |
+| auth | `/auth` | Register, login, refresh, email verification, password reset, admin creation with password complexity rules and tighter auth throttles |
 | users | `/users` | User accounts, roles |
 | sellers | `/sellers` | Profiles, KYC (NIN/BVN), bank accounts |
 | catalog | `/catalog` | Products, variants, media, categories, discounts |

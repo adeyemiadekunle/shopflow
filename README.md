@@ -164,6 +164,11 @@ Protected routes require `Authorization: Bearer <access_token>`.
 | POST | `/logout` | User | Invalidate refresh token |
 | POST | `/admin` | Admin | Create admin account |
 
+Auth hardening notes:
+- Passwords must include uppercase, lowercase, number, and special character.
+- Public auth routes use tighter per-endpoint throttles than the app-wide default.
+- `/refresh` prefers `Authorization: Bearer <refresh_token>` and still accepts a body `refreshToken` for backward compatibility.
+
 ### Users — `/api/v1/users`
 
 CRUD for user accounts. Role-based access (BUYER, SELLER, ADMIN).
