@@ -56,7 +56,10 @@ export class PaystackService {
   async initializeTransaction(params: {
     email: string;
     amountKobo: number;
+    currency: string;
     reference: string;
+    callbackUrl?: string;
+    channels?: string[];
     orderId: string;
     buyerId: string;
     sellerProfileId: string;
@@ -65,7 +68,10 @@ export class PaystackService {
     const { data } = await this.http.post('/transaction/initialize', {
       email: params.email,
       amount: params.amountKobo,
+      currency: params.currency,
       reference: params.reference,
+      callback_url: params.callbackUrl,
+      channels: params.channels,
       metadata: {
         order_id: params.orderId,
         buyer_id: params.buyerId,

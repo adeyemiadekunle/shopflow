@@ -5,20 +5,24 @@ import {
   HttpCode,
   HttpStatus,
   Logger,
+  Param,
   Post,
   Req,
 } from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Public } from '../../common/decorators/public.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
+import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
+import { UserRole } from '../users/enums/user-role.enum';
+import { InitializeCheckoutDto, VerifyPaymentDto } from './dto/payments.dto';
+import { PaymentsService } from './payments.service';
+import { PaystackService } from './paystack.service';
+import { Request } from 'express';
 
 interface RequestWithRawBody extends Request {
   rawBody?: Buffer;
 }
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Request } from 'express';
-import { PaystackService } from './paystack.service';
-import { WebhookEvent } from './entities/webhook-event.entity';
-import { Public } from '../../common/decorators/public.decorator';
 
 @ApiTags('payments')
 @Controller('payments')
@@ -26,10 +30,32 @@ export class PaymentsController {
   private readonly logger = new Logger(PaymentsController.name);
 
   constructor(
+    private readonly paymentsService: PaymentsService,
     private readonly paystackService: PaystackService,
-    @InjectRepository(WebhookEvent)
-    private readonly webhookRepo: Repository<WebhookEvent>,
   ) {}
+
+  @Post('checkout/:orderId')
+  @Roles(UserRole.BUYER)
+  @ApiOperation({
+    summary: 'Initialize a Paystack Checkout transaction for an order',
+  })
+  initializeCheckout(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('orderId') orderId: string,
+    @Body() dto: InitializeCheckoutDto,
+  ) {
+    return this.paymentsService.initializeCheckout(user, orderId, dto);
+  }
+
+  @Post('verify')
+  @Roles(UserRole.BUYER, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Verify a Paystack transaction by reference' })
+  verifyCheckout(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: VerifyPaymentDto,
+  ) {
+    return this.paymentsService.verifyCheckout(dto.reference, user);
+  }
 
   @Post('webhook')
   @Public()
@@ -45,24 +71,11 @@ export class PaymentsController {
       !rawBody ||
       !this.paystackService.verifyWebhookSignature(rawBody, signature)
     ) {
-      this.logger.warn('Rejected webhook — invalid signature');
+      this.logger.warn('Rejected webhook - invalid signature');
       return { received: false };
     }
 
-    const event = this.webhookRepo.create({
-      eventType: body['event'] as string,
-      reference: (body['data'] as Record<string, unknown>)?.['reference'] as
-        | string
-        | undefined,
-      rawPayload: body,
-      processed: false,
-    });
-    await this.webhookRepo.save(event);
-
-    this.logger.log(
-      `Webhook received: ${event.eventType} ref=${event.reference}`,
-    );
-    // TODO: dispatch to queue for async processing
+    await this.paymentsService.processWebhook(body);
     return { received: true };
   }
 }

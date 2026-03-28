@@ -66,8 +66,8 @@ Copy `.env.example` to `.env` and fill in:
 | users | `/users` | User accounts, roles |
 | sellers | `/sellers` | Profiles, KYC (NIN/BVN), bank accounts |
 | catalog | `/catalog` | Products, variants, media, categories, discounts |
-| orders | `/orders` | 14-state order lifecycle |
-| payments | `/payments` | Paystack + webhook handling |
+| orders | `/orders` | Buyer order creation, seller quoting, quote response, scoped order access |
+| payments | `/payments` | Paystack Checkout init, verify, and webhook handling |
 | ledger | `/ledger` | Immutable double-entry ledger (12 event types, 7 account types); atomic `record()` with pessimistic lock; currency from platform config |
 | subscriptions | `/subscriptions` | Seller tiers (Free/Basic/Pro/Enterprise) |
 | platform-config | `/platform-config` | Market identity from env vars (currency, country); business rules (commission, return policy) managed via admin API |
@@ -83,4 +83,40 @@ npm test              # 16/16 tests passing
 npm run test:cov      # Coverage report
 ```
 
-> Test suites: `AppController`, `AuthService`, `LedgerService`, `OrdersService`.
+> Test suites: `AppController`, `AuthService`, `CatalogService`, `LedgerService`, `OrdersService`, `PaymentsService`, `SellersService`.
+
+## Frontend Integration
+
+Recommended buyer checkout flow:
+
+1. Create the order with `POST /api/v1/orders`.
+2. Wait for the seller to send a quote with `POST /api/v1/orders/:id/quote`.
+3. Accept the quote with `POST /api/v1/orders/:id/quote-response`.
+4. Initialize Paystack Checkout with `POST /api/v1/payments/checkout/:orderId`.
+5. Redirect the browser to the returned `authorizationUrl`.
+6. After redirect back from Paystack, call `POST /api/v1/payments/verify`.
+7. Refresh the order from `GET /api/v1/orders/:id`.
+
+Checkout init body:
+
+```json
+{
+  "channels": ["card", "bank_transfer"],
+  "idempotencyKey": "checkout-order-123",
+  "callbackUrl": "http://localhost:3001/payments/callback"
+}
+```
+
+Verify body:
+
+```json
+{
+  "reference": "PAY-RND-123-ABCDEFGH"
+}
+```
+
+Important frontend rules:
+
+- Always send the buyer access token in `Authorization: Bearer <accessToken>`.
+- Use the returned `authorizationUrl` for redirect-based checkout.
+- Treat the webhook-driven backend update as the final payment truth; the verify endpoint is mainly for immediate UI refresh after Paystack redirects back.
