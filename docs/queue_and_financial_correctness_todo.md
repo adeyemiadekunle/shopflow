@@ -30,20 +30,20 @@ What is still missing is the production-grade async and correctness layer around
 
 ## Phase A: Queue Foundation
 
-- [ ] Add BullMQ to `apps/backend`
-- [ ] Add Redis-backed queue configuration module
-- [ ] Add shared queue constants and job names
-- [ ] Add worker registration pattern for NestJS
-- [ ] Add retry/backoff defaults
-- [ ] Add dead-letter queue strategy
+- [x] Add BullMQ to `apps/backend`
+- [x] Add Redis-backed queue configuration module
+- [x] Add shared queue constants and job names
+- [x] Add worker registration pattern for NestJS
+- [x] Add retry/backoff defaults
+- [x] Add dead-letter queue strategy
 - [ ] Add queue health/metrics visibility
 - [ ] Document local queue setup in README
 
 ## Phase B: Payments Queue
 
-- [ ] Move Paystack webhook processing off the request thread
-- [ ] Persist webhook event first, enqueue processing second
-- [ ] Add `payments` worker for payment intent verification
+- [x] Move Paystack webhook processing off the request thread
+- [x] Persist webhook event first, enqueue processing second
+- [x] Add `payments` worker for payment intent verification
 - [ ] Make payment verification idempotent by `paystackReference`
 - [ ] Make webhook processing idempotent by event/reference
 - [ ] Prevent double payment state transitions on repeated webhook delivery
@@ -77,9 +77,10 @@ What is still missing is the production-grade async and correctness layer around
 
 ## Phase E: Orders Queue
 
-- [ ] Queue non-critical order side-effects after order creation
-- [ ] Queue seller notifications after buyer creates order
-- [ ] Queue buyer notifications after seller sends quote
+- [x] Queue non-critical order side-effects after order creation
+- [x] Queue seller notifications after buyer creates order
+- [x] Queue buyer notifications after seller sends quote
+- [x] Queue seller notifications after buyer responds to quote
 - [ ] Queue reminder jobs for stale quotes
 - [ ] Queue expiry/cancellation jobs for abandoned quote states
 - [ ] Queue analytics/event fanout for order milestones
@@ -128,8 +129,8 @@ What is still missing is the production-grade async and correctness layer around
 - [x] Webhook event persistence exists
 - [x] Order checkout flow exists
 - [x] Paystack Checkout init and verify endpoints exist
-- [ ] Queue layer not started
+- [x] Queue layer started
+- [x] Orders notification queue started
 - [ ] Ledger posting on payment success not connected
 - [ ] Reconciliation not implemented
 - [ ] DLQ and worker monitoring not implemented
-

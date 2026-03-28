@@ -1,11 +1,13 @@
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { Queue } from 'bullmq';
 import { Repository } from 'typeorm';
 import { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import {
@@ -16,6 +18,7 @@ import { Order } from '../orders/entities/order.entity';
 import { OrderStatus } from '../orders/enums/order-status.enum';
 import { UsersService } from '../users/users.service';
 import { UserRole } from '../users/enums/user-role.enum';
+import { PAYMENTS_QUEUE, PaymentJobName } from '../queue/queue.constants';
 import {
   InitializeCheckoutDto,
   PaystackCheckoutChannel,
@@ -45,6 +48,8 @@ export class PaymentsService {
     private readonly orderRepo: Repository<Order>,
     @InjectRepository(FulfilmentEvent)
     private readonly fulfilmentEventRepo: Repository<FulfilmentEvent>,
+    @Inject(PAYMENTS_QUEUE)
+    private readonly paymentsQueue: Queue,
     private readonly paystackService: PaystackService,
     private readonly usersService: UsersService,
   ) {}
@@ -313,7 +318,7 @@ export class PaymentsService {
     };
   }
 
-  async processWebhook(body: Record<string, unknown>): Promise<void> {
+  async enqueueWebhook(body: Record<string, unknown>) {
     const data = body['data'] as Record<string, unknown> | undefined;
     const paystackEventIdValue = data?.['id'];
     const paystackEventId =
@@ -332,25 +337,69 @@ export class PaymentsService {
         : null;
 
     if (existingEvent?.processed) {
+      return {
+        received: true,
+        queued: false,
+        eventId: existingEvent.id,
+        status: 'already_processed',
+      };
+    }
+
+    const event = existingEvent
+      ? await this.webhookRepo.save({
+          ...existingEvent,
+          eventType,
+          reference:
+            typeof data?.['reference'] === 'string'
+              ? data['reference']
+              : existingEvent.reference,
+          rawPayload: body,
+          error: undefined,
+        })
+      : await this.webhookRepo.save(
+          this.webhookRepo.create({
+            eventType,
+            paystackEventId: paystackEventId || undefined,
+            reference:
+              typeof data?.['reference'] === 'string'
+                ? data['reference']
+                : undefined,
+            rawPayload: body,
+            processed: false,
+          }),
+        );
+
+    await this.paymentsQueue.add(
+      PaymentJobName.PROCESS_WEBHOOK_EVENT,
+      {
+        webhookEventId: event.id,
+      },
+      {
+        jobId: `payment-webhook:${event.id}`,
+      },
+    );
+
+    return {
+      received: true,
+      queued: true,
+      eventId: event.id,
+    };
+  }
+
+  async processWebhookEvent(webhookEventId: string): Promise<void> {
+    const event = await this.webhookRepo.findOne({
+      where: { id: webhookEventId },
+    });
+
+    if (!event) {
+      throw new NotFoundException(`Webhook event ${webhookEventId} not found`);
+    }
+
+    if (event.processed) {
       return;
     }
 
-    const event =
-      existingEvent ??
-      this.webhookRepo.create({
-        eventType,
-        paystackEventId: paystackEventId || undefined,
-        reference:
-          typeof data?.['reference'] === 'string'
-            ? data['reference']
-            : undefined,
-        rawPayload: body,
-        processed: false,
-      });
-
-    if (!existingEvent) {
-      await this.webhookRepo.save(event);
-    }
+    const body = event.rawPayload;
 
     try {
       if (event.eventType === 'charge.success' && event.reference) {

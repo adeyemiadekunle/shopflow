@@ -53,8 +53,36 @@ export default () => ({
     ttl: parseInt(process.env['THROTTLE_TTL'] ?? '60', 10),
     limit: parseInt(process.env['THROTTLE_LIMIT'] ?? '100', 10),
   },
+  queue: {
+    attempts: parseInt(process.env['QUEUE_ATTEMPTS'] ?? '3', 10),
+    backoffMs: parseInt(process.env['QUEUE_BACKOFF_MS'] ?? '2000', 10),
+    paymentsConcurrency: parseInt(
+      process.env['QUEUE_PAYMENTS_CONCURRENCY'] ?? '5',
+      10,
+    ),
+    ordersConcurrency: parseInt(
+      process.env['QUEUE_ORDERS_CONCURRENCY'] ?? '5',
+      10,
+    ),
+    removeOnCompleteAgeSeconds: parseInt(
+      process.env['QUEUE_REMOVE_ON_COMPLETE_AGE_SECONDS'] ?? '86400',
+      10,
+    ),
+    removeOnCompleteCount: parseInt(
+      process.env['QUEUE_REMOVE_ON_COMPLETE_COUNT'] ?? '1000',
+      10,
+    ),
+    removeOnFailAgeSeconds: parseInt(
+      process.env['QUEUE_REMOVE_ON_FAIL_AGE_SECONDS'] ?? '604800',
+      10,
+    ),
+    removeOnFailCount: parseInt(
+      process.env['QUEUE_REMOVE_ON_FAIL_COUNT'] ?? '5000',
+      10,
+    ),
+  },
   /**
-   * Market identity — set once in .env at deploy time.
+   * Market identity - set once in .env at deploy time.
    * NEVER change these on a live database with existing ledger/order/payment data.
    * Each market deployment (NG, GH, KE, etc.) gets its own instance + database.
    */

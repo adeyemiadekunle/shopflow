@@ -7,7 +7,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Product } from '../catalog/entities/product.entity';
 import { ProductVariant } from '../catalog/entities/product-variant.entity';
-import { PlatformConfigService } from '../platform-config/platform-config.service';
+import { ORDERS_QUEUE } from '../queue/queue.constants';
 import { SellersService } from '../sellers/sellers.service';
 import { UserRole } from '../users/enums/user-role.enum';
 import { DeliveryQuote, QuoteStatus } from './entities/delivery-quote.entity';
@@ -33,8 +33,8 @@ describe('OrdersService', () => {
     status: OrderStatus.PAID,
     itemsTotal: 10000,
     deliveryFee: 500,
-    platformFee: 1000,
-    totalAmount: 11500,
+    platformFee: 0,
+    totalAmount: 10500,
     currency: 'NGN',
     deliveryAddress: { addressLine1: '12 Allen Avenue' },
     createdAt: new Date(),
@@ -91,8 +91,8 @@ describe('OrdersService', () => {
     getByUserIdOrThrow: jest.fn(),
   };
 
-  const mockPlatformConfigService = {
-    getDefaultCommissionRate: jest.fn().mockResolvedValue(10),
+  const mockOrdersQueue = {
+    add: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -100,6 +100,7 @@ describe('OrdersService', () => {
 
     mockOrderRepo.findOne.mockResolvedValue(mockOrder);
     mockOrderRepo.find.mockResolvedValue([mockOrder]);
+    mockOrdersQueue.add.mockResolvedValue({});
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -119,11 +120,8 @@ describe('OrdersService', () => {
           provide: getRepositoryToken(ProductVariant),
           useValue: mockProductVariantRepo,
         },
+        { provide: ORDERS_QUEUE, useValue: mockOrdersQueue },
         { provide: SellersService, useValue: mockSellersService },
-        {
-          provide: PlatformConfigService,
-          useValue: mockPlatformConfigService,
-        },
       ],
     }).compile();
 
@@ -224,8 +222,8 @@ describe('OrdersService', () => {
         sellerProfileId: 'seller-1',
         status: OrderStatus.AWAITING_DELIVERY_QUOTE,
         itemsTotal: 18000,
-        platformFee: 1800,
-        totalAmount: 19800,
+        platformFee: 0,
+        totalAmount: 18000,
         currency: 'NGN',
       })
       .mockResolvedValueOnce({
@@ -259,11 +257,16 @@ describe('OrdersService', () => {
         sellerProfileId: 'seller-1',
         status: OrderStatus.AWAITING_DELIVERY_QUOTE,
         itemsTotal: 18000,
-        platformFee: 1800,
+        platformFee: 0,
       }),
     );
     expect(order.status).toBe(OrderStatus.AWAITING_DELIVERY_QUOTE);
     expect(mockEventRepo.save).toHaveBeenCalled();
+    expect(mockOrdersQueue.add).toHaveBeenCalledWith(
+      'send-order-created-notification',
+      { orderId: 'order-new' },
+      { jobId: 'send-order-created-notification:order-new:na' },
+    );
   });
 
   it('sendDeliveryQuote() should update the order total and quote status', async () => {
@@ -282,7 +285,7 @@ describe('OrdersService', () => {
       ...mockOrder,
       status: OrderStatus.QUOTE_SENT,
       deliveryFee: 2500,
-      totalAmount: 13500,
+      totalAmount: 12500,
     });
 
     const order = await service.sendDeliveryQuote('seller-user-1', 'order-1', {
@@ -297,6 +300,11 @@ describe('OrdersService', () => {
         feeAmount: 2500,
         status: QuoteStatus.SENT,
       }),
+    );
+    expect(mockOrdersQueue.add).toHaveBeenCalledWith(
+      'send-delivery-quote-notification',
+      { orderId: 'order-1' },
+      { jobId: 'send-delivery-quote-notification:order-1:na' },
     );
   });
 
@@ -325,6 +333,11 @@ describe('OrdersService', () => {
         id: 'quote-1',
         status: QuoteStatus.ACCEPTED,
       }),
+    );
+    expect(mockOrdersQueue.add).toHaveBeenCalledWith(
+      'send-quote-response-notification',
+      { orderId: 'order-1', accepted: true },
+      { jobId: 'send-quote-response-notification:order-1:true' },
     );
   });
 

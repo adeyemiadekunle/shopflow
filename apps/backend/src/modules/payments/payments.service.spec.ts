@@ -8,6 +8,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { FulfilmentEvent } from '../orders/entities/fulfilment-event.entity';
 import { Order } from '../orders/entities/order.entity';
 import { OrderStatus } from '../orders/enums/order-status.enum';
+import { PAYMENTS_QUEUE } from '../queue/queue.constants';
 import { UsersService } from '../users/users.service';
 import {
   PaymentIntent,
@@ -65,6 +66,10 @@ describe('PaymentsService', () => {
     verifyTransaction: jest.fn(),
   };
 
+  const mockPaymentsQueue = {
+    add: jest.fn(),
+  };
+
   const mockUsersService = {
     findById: jest.fn(),
   };
@@ -91,6 +96,7 @@ describe('PaymentsService', () => {
           provide: getRepositoryToken(FulfilmentEvent),
           useValue: mockFulfilmentEventRepo,
         },
+        { provide: PAYMENTS_QUEUE, useValue: mockPaymentsQueue },
         { provide: PaystackService, useValue: mockPaystackService },
         { provide: UsersService, useValue: mockUsersService },
       ],
@@ -266,5 +272,35 @@ describe('PaymentsService', () => {
         isActive: true,
       }),
     ).rejects.toThrow(BadRequestException);
+  });
+
+  it('enqueueWebhook() should persist and queue an unprocessed webhook event', async () => {
+    mockWebhookRepo.findOne.mockResolvedValue(null);
+    mockWebhookRepo.save.mockResolvedValue({
+      id: 'webhook-1',
+      eventType: 'charge.success',
+      reference: 'PAY-RND-100-TESTREF',
+      processed: false,
+    });
+    mockPaymentsQueue.add.mockResolvedValue({});
+
+    const result = await service.enqueueWebhook({
+      event: 'charge.success',
+      data: {
+        id: 12345,
+        reference: 'PAY-RND-100-TESTREF',
+      },
+    });
+
+    expect(mockPaymentsQueue.add).toHaveBeenCalledWith(
+      'process-webhook-event',
+      { webhookEventId: 'webhook-1' },
+      { jobId: 'payment-webhook:webhook-1' },
+    );
+    expect(result).toEqual({
+      received: true,
+      queued: true,
+      eventId: 'webhook-1',
+    });
   });
 });
