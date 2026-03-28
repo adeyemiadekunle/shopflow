@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -174,6 +175,30 @@ export class SellersService {
     if (!seller) {
       throw new NotFoundException('Seller profile not found');
     }
+    return seller;
+  }
+
+  async assertCanManageProducts(userId: string): Promise<SellerProfile> {
+    const onboarding = await this.getOnboardingStatus(userId);
+    const seller = onboarding.profile;
+
+    if (seller.status === SellerStatus.SUSPENDED) {
+      throw new ForbiddenException('Seller account is suspended');
+    }
+
+    if (seller.status === SellerStatus.REJECTED) {
+      throw new ForbiddenException('Seller account is restricted');
+    }
+
+    if (!onboarding.canCreateProducts) {
+      const missingFields = onboarding.missingRequirements.join(', ');
+      throw new ForbiddenException(
+        missingFields
+          ? `Complete seller onboarding before managing products: ${missingFields}`
+          : 'Complete seller onboarding before managing products',
+      );
+    }
+
     return seller;
   }
 
