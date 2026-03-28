@@ -10,11 +10,13 @@ import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { UsersModule } from '../users/users.module';
 import { MailModule } from '../mail/mail.module';
+import { SellersModule } from '../sellers/sellers.module';
 
 @Module({
   imports: [
     UsersModule,
     MailModule,
+    SellersModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({}),
   ],

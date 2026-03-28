@@ -22,6 +22,7 @@ import {
 } from './dto/auth.dto';
 import { UserRole } from '../users/enums/user-role.enum';
 import { MailService } from '../mail/mail.service';
+import { SellersService } from '../sellers/sellers.service';
 
 @Injectable()
 export class AuthService {
@@ -31,6 +32,7 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly config: ConfigService,
     private readonly mailService: MailService,
+    private readonly sellersService: SellersService,
   ) {}
 
   private async hashValue(value: string): Promise<string> {
@@ -39,6 +41,22 @@ export class AuthService {
 
   private normalizeEmail(email: string): string {
     return email.trim().toLowerCase();
+  }
+
+  private buildDefaultStoreName(dto: RegisterDto, email: string): string {
+    if (dto.storeName?.trim()) {
+      return dto.storeName.trim();
+    }
+
+    const fullName = [dto.firstName?.trim(), dto.lastName?.trim()]
+      .filter(Boolean)
+      .join(' ');
+    if (fullName) {
+      return fullName;
+    }
+
+    const emailLocalPart = email.split('@')[0]?.trim();
+    return emailLocalPart || 'Seller Store';
   }
 
   private generateOpaqueToken(): string {
@@ -115,6 +133,14 @@ export class AuthService {
       role,
     });
     await this.usersService.save(user);
+
+    if (role === UserRole.SELLER) {
+      await this.sellersService.createForUser({
+        userId: user.id,
+        email: user.email,
+        storeName: this.buildDefaultStoreName(dto, email),
+      });
+    }
 
     try {
       await this.issueEmailVerificationToken(user.id, user.email);

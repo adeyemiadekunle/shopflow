@@ -6,6 +6,7 @@ import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { UserRole } from '../users/enums/user-role.enum';
 import { MailService } from '../mail/mail.service';
+import { SellersService } from '../sellers/sellers.service';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -26,7 +27,10 @@ describe('AuthService', () => {
     findByIdWithTokenHash: jest.fn(),
     findById: jest.fn(),
     save: jest.fn(),
-    create: jest.fn((value: Record<string, unknown>) => ({ ...value })),
+    create: jest.fn((value: Record<string, unknown>) => ({
+      id: 'user-1',
+      ...value,
+    })),
   };
 
   const mockConfigService = {
@@ -46,6 +50,10 @@ describe('AuthService', () => {
     sendPasswordResetEmail: jest.fn(),
   };
 
+  const mockSellersService = {
+    createForUser: jest.fn(),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -55,6 +63,7 @@ describe('AuthService', () => {
         { provide: UsersService, useValue: mockUsersService },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: MailService, useValue: mockMailService },
+        { provide: SellersService, useValue: mockSellersService },
       ],
     }).compile();
 
@@ -124,6 +133,50 @@ describe('AuthService', () => {
     expect(mockUsersService.findByEmail).toHaveBeenCalledWith(
       'buyer@example.com',
     );
+  });
+
+  it('register() should create a seller profile for seller signups', async () => {
+    mockUsersService.findByEmail.mockResolvedValue(null);
+    mockUsersService.save.mockResolvedValue(undefined);
+    mockSellersService.createForUser.mockResolvedValue({
+      id: 'seller-profile-1',
+    });
+
+    const result = await service.register({
+      email: 'seller@example.com',
+      password: 'SecurePass123!',
+      firstName: 'Tola',
+      lastName: 'Stores',
+      role: UserRole.SELLER,
+    });
+
+    expect(result.role).toBe(UserRole.SELLER);
+    expect(mockSellersService.createForUser).toHaveBeenCalledWith({
+      userId: expect.any(String),
+      email: 'seller@example.com',
+      storeName: 'Tola Stores',
+    });
+  });
+
+  it('register() should honor an explicit seller store name', async () => {
+    mockUsersService.findByEmail.mockResolvedValue(null);
+    mockUsersService.save.mockResolvedValue(undefined);
+    mockSellersService.createForUser.mockResolvedValue({
+      id: 'seller-profile-1',
+    });
+
+    await service.register({
+      email: 'seller@example.com',
+      password: 'SecurePass123!',
+      role: UserRole.SELLER,
+      storeName: '  Tola Fashion House  ',
+    });
+
+    expect(mockSellersService.createForUser).toHaveBeenCalledWith({
+      userId: expect.any(String),
+      email: 'seller@example.com',
+      storeName: 'Tola Fashion House',
+    });
   });
 
   it('login() should normalize the email before lookup', async () => {

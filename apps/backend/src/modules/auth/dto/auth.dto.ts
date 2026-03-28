@@ -39,6 +39,15 @@ export class RegisterDto {
   @IsString()
   lastName?: string;
 
+  @ApiProperty({
+    required: false,
+    description:
+      'Optional storefront name for seller registration. If omitted, one is derived automatically.',
+  })
+  @IsOptional()
+  @IsString()
+  storeName?: string;
+
   /**
    * Role for registration. Defaults to BUYER.
    * Only BUYER and SELLER are allowed for self-registration.

@@ -39,14 +39,23 @@ export class SellerKyc {
   @Column({ name: 'id_document_url', nullable: true })
   idDocumentUrl?: string;
 
-  @Column({ name: 'address', nullable: true })
-  address?: string;
+  @Column({ name: 'address_line_1', nullable: true })
+  addressLine1?: string;
+
+  @Column({ name: 'address_line_2', nullable: true })
+  addressLine2?: string;
 
   @Column({ name: 'state', nullable: true })
   state?: string;
 
   @Column({ name: 'lga', nullable: true })
   lga?: string;
+
+  @Column({ name: 'postcode', nullable: true })
+  postcode?: string;
+
+  @Column({ name: 'country', length: 2, nullable: true })
+  country?: string;
 
   @Column({ name: 'verified_at', type: 'timestamp', nullable: true })
   verifiedAt?: Date;
