@@ -72,6 +72,58 @@ export class PaymentsService {
     return Array.from(new Set(channels));
   }
 
+  private isSuccessfulVerifyResponse(
+    verifyResponse: PaystackVerifyResponse,
+  ): boolean {
+    return verifyResponse.status === 'success';
+  }
+
+  private isFailedVerifyResponse(
+    verifyResponse: PaystackVerifyResponse,
+  ): boolean {
+    return (
+      verifyResponse.status === 'failed' ||
+      verifyResponse.status === 'abandoned'
+    );
+  }
+
+  private isSameFinalOutcome(
+    intent: PaymentIntent,
+    verifyResponse: PaystackVerifyResponse,
+  ): boolean {
+    return (
+      (intent.status === PaymentIntentStatus.SUCCEEDED &&
+        this.isSuccessfulVerifyResponse(verifyResponse)) ||
+      (intent.status === PaymentIntentStatus.FAILED &&
+        this.isFailedVerifyResponse(verifyResponse))
+    );
+  }
+
+  private async findExistingWebhookEvent(
+    eventType: string,
+    paystackEventId?: string,
+    reference?: string,
+  ): Promise<WebhookEvent | null> {
+    const orWhere: Array<Partial<WebhookEvent>> = [];
+
+    if (paystackEventId) {
+      orWhere.push({ paystackEventId });
+    }
+
+    if (reference) {
+      orWhere.push({ eventType, reference });
+    }
+
+    if (orWhere.length === 0) {
+      return null;
+    }
+
+    return this.webhookRepo.findOne({
+      where: orWhere,
+      order: { createdAt: 'DESC' },
+    });
+  }
+
   private async getIntentByReferenceOrThrow(
     reference: string,
   ): Promise<PaymentIntent> {
@@ -196,6 +248,19 @@ export class PaymentsService {
 
     if (verifyResponse.currency !== intent.currency) {
       throw new BadRequestException('Payment currency mismatch');
+    }
+
+    if (this.isSameFinalOutcome(intent, verifyResponse)) {
+      return intent;
+    }
+
+    if (
+      intent.status === PaymentIntentStatus.SUCCEEDED &&
+      this.isFailedVerifyResponse(verifyResponse)
+    ) {
+      throw new BadRequestException(
+        'Refusing to overwrite a successful payment with a failed verification result',
+      );
     }
 
     const nextStatus =
@@ -329,12 +394,13 @@ export class PaymentsService {
     const eventTypeValue = body['event'];
     const eventType =
       typeof eventTypeValue === 'string' ? eventTypeValue : 'unknown';
-    const existingEvent =
-      paystackEventId.length > 0
-        ? await this.webhookRepo.findOne({
-            where: { paystackEventId },
-          })
-        : null;
+    const reference =
+      typeof data?.['reference'] === 'string' ? data['reference'] : undefined;
+    const existingEvent = await this.findExistingWebhookEvent(
+      eventType,
+      paystackEventId || undefined,
+      reference,
+    );
 
     if (existingEvent?.processed) {
       return {
@@ -349,10 +415,7 @@ export class PaymentsService {
       ? await this.webhookRepo.save({
           ...existingEvent,
           eventType,
-          reference:
-            typeof data?.['reference'] === 'string'
-              ? data['reference']
-              : existingEvent.reference,
+          reference: reference ?? existingEvent.reference,
           rawPayload: body,
           error: undefined,
         })
@@ -360,10 +423,7 @@ export class PaymentsService {
           this.webhookRepo.create({
             eventType,
             paystackEventId: paystackEventId || undefined,
-            reference:
-              typeof data?.['reference'] === 'string'
-                ? data['reference']
-                : undefined,
+            reference,
             rawPayload: body,
             processed: false,
           }),
@@ -404,19 +464,29 @@ export class PaymentsService {
     try {
       if (event.eventType === 'charge.success' && event.reference) {
         const intent = await this.getIntentByReferenceOrThrow(event.reference);
-        const verifyResponse = await this.paystackService.verifyTransaction(
-          event.reference,
-        );
-        await this.finalizeVerifiedPayment(intent, verifyResponse);
+        if (intent.status !== PaymentIntentStatus.SUCCEEDED) {
+          const verifyResponse = await this.paystackService.verifyTransaction(
+            event.reference,
+          );
+          await this.finalizeVerifiedPayment(intent, verifyResponse);
+        }
       }
 
       if (event.eventType === 'charge.failed' && event.reference) {
         const intent = await this.getIntentByReferenceOrThrow(event.reference);
-        await this.paymentIntentRepo.save({
-          ...intent,
-          status: PaymentIntentStatus.FAILED,
-          rawVerifyPayload: body,
-        });
+        if (intent.status !== PaymentIntentStatus.SUCCEEDED) {
+          if (intent.status !== PaymentIntentStatus.FAILED) {
+            await this.paymentIntentRepo.save({
+              ...intent,
+              status: PaymentIntentStatus.FAILED,
+              rawVerifyPayload: body,
+            });
+          }
+        } else {
+          this.logger.warn(
+            `Ignoring charge.failed webhook for already successful payment ${event.reference}`,
+          );
+        }
       }
 
       await this.webhookRepo.save({

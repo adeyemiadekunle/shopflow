@@ -67,10 +67,7 @@ export class OrdersController {
   @Post(':id/cancel')
   @Roles(UserRole.BUYER)
   @ApiOperation({ summary: 'Cancel an order before payment is confirmed' })
-  cancelOrder(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
-  ) {
+  cancelOrder(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.ordersService.cancelByBuyer(user.id, id);
   }
 

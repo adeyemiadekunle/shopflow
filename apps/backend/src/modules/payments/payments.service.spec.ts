@@ -274,6 +274,49 @@ describe('PaymentsService', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
+  it('verifyCheckout() should be idempotent for already succeeded intents', async () => {
+    const succeededIntent = {
+      id: 'intent-1',
+      orderId: 'order-1',
+      buyerId: 'buyer-1',
+      paystackReference: 'PAY-RND-100-TESTREF',
+      amountKobo: 1980000,
+      currency: 'NGN',
+      status: PaymentIntentStatus.SUCCEEDED,
+      verifiedAt: new Date('2026-03-28T16:55:00.000Z'),
+    };
+
+    mockPaymentIntentRepo.findOne.mockResolvedValue(succeededIntent);
+    mockPaystackService.verifyTransaction.mockResolvedValue({
+      status: 'success',
+      reference: 'PAY-RND-100-TESTREF',
+      amount: 1980000,
+      currency: 'NGN',
+      paid_at: '2026-03-28T16:55:00.000Z',
+      channel: 'card',
+      metadata: {},
+      authorization: {
+        authorization_code: 'AUTH_CODE',
+        card_type: 'visa',
+        last4: '4081',
+        bank: 'Test Bank',
+      },
+    });
+
+    const result = await service.verifyCheckout('PAY-RND-100-TESTREF', {
+      id: 'buyer-1',
+      email: 'buyer@example.com',
+      role: 'buyer',
+      isEmailVerified: true,
+      isActive: true,
+    });
+
+    expect(result.paymentIntent).toBe(succeededIntent);
+    expect(mockPaymentIntentRepo.save).not.toHaveBeenCalled();
+    expect(mockOrderRepo.save).not.toHaveBeenCalled();
+    expect(mockFulfilmentEventRepo.save).not.toHaveBeenCalled();
+  });
+
   it('enqueueWebhook() should persist and queue an unprocessed webhook event', async () => {
     mockWebhookRepo.findOne.mockResolvedValue(null);
     mockWebhookRepo.save.mockResolvedValue({
@@ -302,5 +345,76 @@ describe('PaymentsService', () => {
       queued: true,
       eventId: 'webhook-1',
     });
+  });
+
+  it('enqueueWebhook() should reuse an existing event for duplicate charge.success references', async () => {
+    mockWebhookRepo.findOne.mockResolvedValue({
+      id: 'webhook-1',
+      eventType: 'charge.success',
+      reference: 'PAY-RND-100-TESTREF',
+      processed: false,
+      rawPayload: {},
+    });
+    mockWebhookRepo.save.mockResolvedValue({
+      id: 'webhook-1',
+      eventType: 'charge.success',
+      reference: 'PAY-RND-100-TESTREF',
+      processed: false,
+    });
+    mockPaymentsQueue.add.mockResolvedValue({});
+
+    const result = await service.enqueueWebhook({
+      event: 'charge.success',
+      data: {
+        reference: 'PAY-RND-100-TESTREF',
+      },
+    });
+
+    expect(mockWebhookRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'webhook-1',
+        eventType: 'charge.success',
+        reference: 'PAY-RND-100-TESTREF',
+      }),
+    );
+    expect(mockPaymentsQueue.add).toHaveBeenCalledWith(
+      'process-webhook-event',
+      { webhookEventId: 'webhook-1' },
+      { jobId: 'payment-webhook:webhook-1' },
+    );
+    expect(result).toEqual({
+      received: true,
+      queued: true,
+      eventId: 'webhook-1',
+    });
+  });
+
+  it('processWebhookEvent() should ignore charge.failed for already successful intents', async () => {
+    mockWebhookRepo.findOne.mockResolvedValue({
+      id: 'webhook-1',
+      eventType: 'charge.failed',
+      reference: 'PAY-RND-100-TESTREF',
+      processed: false,
+      rawPayload: { event: 'charge.failed' },
+    });
+    mockPaymentIntentRepo.findOne.mockResolvedValue({
+      id: 'intent-1',
+      orderId: 'order-1',
+      buyerId: 'buyer-1',
+      paystackReference: 'PAY-RND-100-TESTREF',
+      amountKobo: 1980000,
+      currency: 'NGN',
+      status: PaymentIntentStatus.SUCCEEDED,
+    });
+
+    await service.processWebhookEvent('webhook-1');
+
+    expect(mockPaymentIntentRepo.save).not.toHaveBeenCalled();
+    expect(mockWebhookRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'webhook-1',
+        processed: true,
+      }),
+    );
   });
 });
