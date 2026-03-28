@@ -16,13 +16,11 @@ import {
   LoginDto,
   RequestPasswordResetDto,
   ResendVerificationEmailDto,
-  RefreshTokenDto,
   ResetPasswordDto,
   RegisterDto,
   VerifyEmailDto,
 } from './dto/auth.dto';
 import { UserRole } from '../users/enums/user-role.enum';
-import { JwtPayload } from './strategies/jwt.strategy';
 import { MailService } from '../mail/mail.service';
 
 @Injectable()
@@ -210,23 +208,6 @@ export class AuthService {
       refreshToken: newRefreshToken,
       role: user.role,
     };
-  }
-
-  async refresh(dto: RefreshTokenDto) {
-    const secret = this.config.get<string>('jwt.refreshSecret') ?? '';
-
-    let payload: JwtPayload;
-    try {
-      payload = jwt.verify(dto.refreshToken, secret) as JwtPayload;
-    } catch {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
-
-    if (!payload.sub) {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
-
-    return this.refreshTokens(payload.sub, dto.refreshToken);
   }
 
   async verifyEmail(dto: VerifyEmailDto) {

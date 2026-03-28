@@ -6,15 +6,16 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
+import { AUTH_THROTTLES } from './auth.constants';
 import {
   CreateAdminDto,
   LoginDto,
   RequestPasswordResetDto,
   ResendVerificationEmailDto,
-  RefreshTokenDto,
   ResetPasswordDto,
   RegisterDto,
   VerifyEmailDto,
@@ -23,6 +24,8 @@ import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
+import type { RefreshTokenUser } from './strategies/jwt-refresh.strategy';
 import { UserRole } from '../users/enums/user-role.enum';
 
 @ApiTags('auth')
@@ -36,6 +39,7 @@ export class AuthController {
    */
   @Post('register')
   @Public()
+  @Throttle({ default: AUTH_THROTTLES.register })
   @ApiOperation({ summary: 'Register a buyer or seller account' })
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
@@ -47,6 +51,7 @@ export class AuthController {
    */
   @Post('login')
   @Public()
+  @Throttle({ default: AUTH_THROTTLES.login })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Login — works for buyer, seller, and admin',
@@ -62,14 +67,22 @@ export class AuthController {
    */
   @Post('refresh')
   @Public()
+  @UseGuards(JwtRefreshGuard)
+  @Throttle({ default: AUTH_THROTTLES.refresh })
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Refresh access + refresh tokens' })
-  refresh(@Body() dto: RefreshTokenDto) {
-    return this.authService.refresh(dto);
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Refresh access + refresh tokens',
+    description:
+      'Send the refresh token in the Authorization Bearer header. Request body `refreshToken` is also accepted for backward compatibility.',
+  })
+  refresh(@CurrentUser() user: RefreshTokenUser) {
+    return this.authService.refreshTokens(user.userId, user.refreshToken);
   }
 
   @Post('verify-email')
   @Public()
+  @Throttle({ default: AUTH_THROTTLES.verifyEmail })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Verify email using a one-time token' })
   verifyEmail(@Body() dto: VerifyEmailDto) {
@@ -78,6 +91,7 @@ export class AuthController {
 
   @Post('verify-email/resend')
   @Public()
+  @Throttle({ default: AUTH_THROTTLES.resendVerificationEmail })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Resend verification email' })
   resendVerificationEmail(@Body() dto: ResendVerificationEmailDto) {
@@ -86,6 +100,7 @@ export class AuthController {
 
   @Post('forgot-password')
   @Public()
+  @Throttle({ default: AUTH_THROTTLES.forgotPassword })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Request a password reset email' })
   requestPasswordReset(@Body() dto: RequestPasswordResetDto) {
@@ -94,6 +109,7 @@ export class AuthController {
 
   @Post('reset-password')
   @Public()
+  @Throttle({ default: AUTH_THROTTLES.resetPassword })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Reset password using a one-time token' })
   resetPassword(@Body() dto: ResetPasswordDto) {

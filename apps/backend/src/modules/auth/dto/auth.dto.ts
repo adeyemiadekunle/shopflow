@@ -1,12 +1,17 @@
 import {
   IsEmail,
   IsEnum,
+  Matches,
   IsOptional,
   IsString,
   MinLength,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { UserRole } from '../../users/enums/user-role.enum';
+import {
+  PASSWORD_COMPLEXITY_MESSAGE,
+  PASSWORD_COMPLEXITY_REGEX,
+} from '../auth.constants';
 
 /** Roles that can self-register. Admin accounts are created separately by existing admins. */
 const SELF_REGISTERABLE_ROLES = [UserRole.BUYER, UserRole.SELLER] as const;
@@ -19,6 +24,9 @@ export class RegisterDto {
   @ApiProperty({ example: 'SecurePass123!' })
   @IsString()
   @MinLength(8)
+  @Matches(PASSWORD_COMPLEXITY_REGEX, {
+    message: PASSWORD_COMPLEXITY_MESSAGE,
+  })
   password!: string;
 
   @ApiProperty({ required: false })
@@ -70,12 +78,6 @@ export class LoginDto {
   expectedRole?: UserRole;
 }
 
-export class RefreshTokenDto {
-  @ApiProperty()
-  @IsString()
-  refreshToken!: string;
-}
-
 export class VerifyEmailDto {
   @ApiProperty({ example: 'buyer@example.com' })
   @IsEmail()
@@ -110,6 +112,9 @@ export class ResetPasswordDto {
   @ApiProperty({ example: 'NewSecurePass123!' })
   @IsString()
   @MinLength(8)
+  @Matches(PASSWORD_COMPLEXITY_REGEX, {
+    message: PASSWORD_COMPLEXITY_MESSAGE,
+  })
   password!: string;
 }
 
@@ -122,6 +127,9 @@ export class CreateAdminDto {
   @ApiProperty()
   @IsString()
   @MinLength(12)
+  @Matches(PASSWORD_COMPLEXITY_REGEX, {
+    message: PASSWORD_COMPLEXITY_MESSAGE,
+  })
   password!: string;
 
   @ApiProperty({ required: false })
