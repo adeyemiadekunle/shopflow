@@ -25,6 +25,12 @@ export interface PaystackVerifyResponse {
   };
 }
 
+export interface PaystackResolveAccountResponse {
+  account_number: string;
+  account_name: string;
+  bank_id?: number;
+}
+
 @Injectable()
 export class PaystackService {
   private readonly http: AxiosInstance;
@@ -73,6 +79,19 @@ export class PaystackService {
   async verifyTransaction(reference: string): Promise<PaystackVerifyResponse> {
     const { data } = await this.http.get(`/transaction/verify/${reference}`);
     return data.data as PaystackVerifyResponse;
+  }
+
+  async resolveAccountNumber(params: {
+    accountNumber: string;
+    bankCode: string;
+  }): Promise<PaystackResolveAccountResponse> {
+    const { data } = await this.http.get('/bank/resolve', {
+      params: {
+        account_number: params.accountNumber,
+        bank_code: params.bankCode,
+      },
+    });
+    return data.data as PaystackResolveAccountResponse;
   }
 
   async refund(transactionId: string, amountKobo?: number): Promise<unknown> {

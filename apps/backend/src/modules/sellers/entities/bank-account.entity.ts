@@ -21,8 +21,8 @@ export class BankAccount {
   @Column({ name: 'seller_profile_id' })
   sellerProfileId!: string;
 
-  @Column({ name: 'bank_code', length: 10 })
-  bankCode!: string;
+  @Column({ name: 'bank_code', length: 10, nullable: true })
+  bankCode?: string;
 
   @Column({ name: 'bank_name', length: 200 })
   bankName!: string;
@@ -35,6 +35,15 @@ export class BankAccount {
 
   @Column({ name: 'is_primary', default: false })
   isPrimary!: boolean;
+
+  @Column({ name: 'is_verified', default: false })
+  isVerified!: boolean;
+
+  @Column({ name: 'resolved_account_name', nullable: true })
+  resolvedAccountName?: string;
+
+  @Column({ name: 'verified_at', type: 'timestamp', nullable: true })
+  verifiedAt?: Date;
 
   @Column({ name: 'paystack_recipient_code', nullable: true })
   paystackRecipientCode?: string;
