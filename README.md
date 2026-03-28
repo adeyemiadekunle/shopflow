@@ -203,12 +203,68 @@ PENDING_PAYMENT → PAID → SELLER_PREPARING → READY_FOR_PICKUP
 
 Every transition logged in `FulfilmentEvent` for full audit trail.
 
+Current order routes:
+
+| Method | Route | Auth | Description |
+|---|---|---|---|
+| POST | `/orders` | Buyer | Create a single-seller order |
+| GET | `/orders/my` | Buyer | List buyer orders |
+| GET | `/orders/seller` | Seller | List seller orders |
+| POST | `/orders/:id/quote` | Seller | Send delivery quote |
+| POST | `/orders/:id/quote-response` | Buyer | Accept or decline quote |
+| GET | `/orders/:id` | Buyer/Seller/Admin | Get one accessible order |
+
 ### Payments — `/api/v1/payments`
 
 - Paystack payment initialisation and verification
 - Webhook handling with HMAC signature verification
 - Raw webhook events stored in `webhook_events` for deduplication and replay
 - Idempotency keys on payment intents
+
+Current payment routes:
+
+| Method | Route | Auth | Description |
+|---|---|---|---|
+| POST | `/payments/checkout/:orderId` | Buyer | Initialize Paystack Checkout and return `authorizationUrl` |
+| POST | `/payments/verify` | Buyer/Admin | Verify a Paystack transaction by reference |
+| POST | `/payments/webhook` | Public | Paystack webhook receiver |
+
+### Frontend Checkout Flow
+
+Recommended frontend implementation:
+
+1. Buyer creates the order with `POST /api/v1/orders`.
+2. Seller sends the delivery quote with `POST /api/v1/orders/:id/quote`.
+3. Buyer accepts the quote with `POST /api/v1/orders/:id/quote-response`.
+4. Frontend calls `POST /api/v1/payments/checkout/:orderId` with the buyer access token.
+5. Backend returns `authorizationUrl`, `reference`, and `accessCode`.
+6. Frontend redirects the buyer to `authorizationUrl`.
+7. After Paystack returns to the frontend, call `POST /api/v1/payments/verify` with the `reference`.
+8. Frontend refreshes the order with `GET /api/v1/orders/:id`.
+
+Example checkout init request:
+
+```json
+{
+  "channels": ["card", "bank_transfer"],
+  "idempotencyKey": "checkout-order-123",
+  "callbackUrl": "http://localhost:3001/payments/callback"
+}
+```
+
+Example verify request:
+
+```json
+{
+  "reference": "PAY-RND-123-ABCDEFGH"
+}
+```
+
+Frontend notes:
+
+- Send the buyer JWT as `Authorization: Bearer <accessToken>` for order and payment calls.
+- The backend, not the frontend, talks to Paystack.
+- Webhooks remain the source of truth for final payment confirmation; the verify endpoint is for immediate UI refresh after redirect.
 
 ### Ledger — `/api/v1/ledger` (internal)
 
