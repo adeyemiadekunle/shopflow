@@ -396,6 +396,39 @@ describe('OrdersService', () => {
     );
   });
 
+  it('cancelByBuyer() should cancel pre-payment buyer orders', async () => {
+    mockOrderRepo.findOne.mockResolvedValueOnce({
+      ...mockOrder,
+      status: OrderStatus.QUOTE_ACCEPTED,
+    });
+    mockOrderRepo.findOne.mockResolvedValueOnce({
+      ...mockOrder,
+      status: OrderStatus.CANCELLED,
+    });
+
+    const order = await service.cancelByBuyer('buyer-1', 'order-1');
+
+    expect(order.status).toBe(OrderStatus.CANCELLED);
+    expect(mockOrderRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'order-1',
+        status: OrderStatus.CANCELLED,
+      }),
+    );
+    expect(mockEventRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderId: 'order-1',
+        type: FulfilmentEventType.CANCELLED,
+      }),
+    );
+  });
+
+  it('cancelByBuyer() should reject cancellation after payment', async () => {
+    await expect(service.cancelByBuyer('buyer-1', 'order-1')).rejects.toThrow(
+      BadRequestException,
+    );
+  });
+
   it('findForUser() should block unrelated buyers from accessing the order', async () => {
     await expect(
       service.findForUser('order-1', {

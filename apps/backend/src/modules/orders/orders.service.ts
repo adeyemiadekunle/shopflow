@@ -492,6 +492,49 @@ export class OrdersService {
     return this.findById(orderId);
   }
 
+  async cancelByBuyer(buyerId: string, orderId: string): Promise<Order> {
+    const order = await this.findById(orderId);
+
+    if (order.buyerId !== buyerId) {
+      throw new ForbiddenException('You can only cancel your own orders');
+    }
+
+    const cancellableStatuses: OrderStatus[] = [
+      OrderStatus.AWAITING_DELIVERY_QUOTE,
+      OrderStatus.QUOTE_SENT,
+      OrderStatus.QUOTE_ACCEPTED,
+      OrderStatus.PAYMENT_PENDING,
+    ];
+
+    if (!cancellableStatuses.includes(order.status)) {
+      throw new BadRequestException(
+        `Orders cannot be cancelled by the buyer once they reach status ${order.status}`,
+      );
+    }
+
+    if (order.status === OrderStatus.QUOTE_SENT) {
+      const latestQuote = await this.getLatestQuote(orderId);
+      if (latestQuote?.status === QuoteStatus.SENT) {
+        latestQuote.status = QuoteStatus.DECLINED;
+        latestQuote.respondedAt = new Date();
+        await this.deliveryQuoteRepo.save(latestQuote);
+      }
+    }
+
+    order.status = OrderStatus.CANCELLED;
+    await this.orderRepo.save(order);
+
+    await this.logEvent(
+      orderId,
+      FulfilmentEventType.CANCELLED,
+      buyerId,
+      'Order cancelled by buyer before payment confirmation.',
+      { cancelledBy: 'buyer' },
+    );
+
+    return this.findById(orderId);
+  }
+
   async transition(
     orderId: string,
     targetStatus: OrderStatus,
