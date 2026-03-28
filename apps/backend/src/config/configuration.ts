@@ -64,6 +64,22 @@ export default () => ({
       process.env['QUEUE_ORDERS_CONCURRENCY'] ?? '5',
       10,
     ),
+    sellerQuoteReminderDelayMs: parseInt(
+      process.env['QUEUE_SELLER_QUOTE_REMINDER_DELAY_MS'] ?? '1800000',
+      10,
+    ),
+    sellerQuoteExpiryDelayMs: parseInt(
+      process.env['QUEUE_SELLER_QUOTE_EXPIRY_DELAY_MS'] ?? '86400000',
+      10,
+    ),
+    buyerQuoteReminderDelayMs: parseInt(
+      process.env['QUEUE_BUYER_QUOTE_REMINDER_DELAY_MS'] ?? '1800000',
+      10,
+    ),
+    buyerQuoteExpiryDelayMs: parseInt(
+      process.env['QUEUE_BUYER_QUOTE_EXPIRY_DELAY_MS'] ?? '86400000',
+      10,
+    ),
     removeOnCompleteAgeSeconds: parseInt(
       process.env['QUEUE_REMOVE_ON_COMPLETE_AGE_SECONDS'] ?? '86400',
       10,

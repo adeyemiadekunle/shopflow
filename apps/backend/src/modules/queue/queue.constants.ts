@@ -15,6 +15,10 @@ export enum OrderJobName {
   SEND_ORDER_CREATED_NOTIFICATION = 'send-order-created-notification',
   SEND_DELIVERY_QUOTE_NOTIFICATION = 'send-delivery-quote-notification',
   SEND_QUOTE_RESPONSE_NOTIFICATION = 'send-quote-response-notification',
+  SEND_SELLER_QUOTE_REMINDER = 'send-seller-quote-reminder',
+  SEND_BUYER_QUOTE_RESPONSE_REMINDER = 'send-buyer-quote-response-reminder',
+  EXPIRE_AWAITING_DELIVERY_QUOTE = 'expire-awaiting-delivery-quote',
+  EXPIRE_QUOTE_SENT = 'expire-quote-sent',
 }
 
 export enum DeadLetterJobName {

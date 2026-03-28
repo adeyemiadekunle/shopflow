@@ -81,8 +81,8 @@ What is still missing is the production-grade async and correctness layer around
 - [x] Queue seller notifications after buyer creates order
 - [x] Queue buyer notifications after seller sends quote
 - [x] Queue seller notifications after buyer responds to quote
-- [ ] Queue reminder jobs for stale quotes
-- [ ] Queue expiry/cancellation jobs for abandoned quote states
+- [x] Queue reminder jobs for stale quotes
+- [x] Queue expiry/cancellation jobs for abandoned quote states
 - [ ] Queue analytics/event fanout for order milestones
 - [ ] Keep synchronous order writes limited to source-of-truth DB records
 
@@ -131,6 +131,7 @@ What is still missing is the production-grade async and correctness layer around
 - [x] Paystack Checkout init and verify endpoints exist
 - [x] Queue layer started
 - [x] Orders notification queue started
+- [x] Orders reminder and expiry queue started
 - [ ] Ledger posting on payment success not connected
 - [ ] Reconciliation not implemented
 - [ ] DLQ and worker monitoring not implemented
