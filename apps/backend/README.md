@@ -70,7 +70,7 @@ Copy `.env.example` to `.env` and fill in:
 | sellers | `/sellers` | Profiles, KYC (NIN/BVN), bank accounts |
 | catalog | `/catalog` | Products, variants, media, categories, discounts |
 | orders | `/orders` | Buyer order creation, seller quoting, quote response, scoped order access |
-| payments | `/payments` | Paystack Checkout init, verify, and webhook handling |
+| payments | `/payments` | Paystack Checkout init, verify, webhook handling, and admin reconciliation reporting |
 | ledger | `/ledger` | Immutable double-entry ledger (12 event types, 7 account types); atomic `record()` with pessimistic lock; currency from platform config |
 | subscriptions | `/subscriptions` | Seller tiers (Free/Basic/Pro/Enterprise) |
 | platform-config | `/platform-config` | Market identity from env vars (currency, country); business rules (commission, return policy) managed via admin API |

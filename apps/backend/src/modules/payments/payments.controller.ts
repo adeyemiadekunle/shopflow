@@ -1,12 +1,14 @@
 import {
   Body,
   Controller,
+  Get,
   Headers,
   HttpCode,
   HttpStatus,
   Logger,
   Param,
   Post,
+  Query,
   Req,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -55,6 +57,35 @@ export class PaymentsController {
     @Body() dto: VerifyPaymentDto,
   ) {
     return this.paymentsService.verifyCheckout(dto.reference, user);
+  }
+
+  @Post('reconciliation/run')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Queue an immediate payment reconciliation run' })
+  enqueueReconciliationRun(@CurrentUser() user: AuthenticatedUser) {
+    return this.paymentsService.enqueueReconciliationRun(
+      'manual',
+      user.id,
+      true,
+    );
+  }
+
+  @Get('reconciliation/runs')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'List recent payment reconciliation runs' })
+  getReconciliationRuns(@Query('limit') limit?: string) {
+    return this.paymentsService.getRecentReconciliationRuns(
+      Number.parseInt(limit ?? '20', 10),
+    );
+  }
+
+  @Get('reconciliation/issues')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'List recent payment reconciliation issues' })
+  getReconciliationIssues(@Query('limit') limit?: string) {
+    return this.paymentsService.getRecentReconciliationIssues(
+      Number.parseInt(limit ?? '50', 10),
+    );
   }
 
   @Post('webhook')

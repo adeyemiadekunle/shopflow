@@ -10,6 +10,7 @@ import { Job, Queue, QueueEvents, Worker } from 'bullmq';
 import {
   DEAD_LETTER_QUEUE,
   DeadLetterJobName,
+  PAYMENTS_QUEUE,
   PaymentJobName,
   QUEUE_CONNECTION_OPTIONS,
   QueueName,
@@ -37,10 +38,27 @@ type ProcessWebhookEventJobData = {
   webhookEventId: string;
 };
 
+type RunPaymentReconciliationJobData = {
+  trigger: 'manual' | 'scheduled';
+  initiatedByUserId?: string;
+};
+
 type ProcessWebhookEventJob = Job<
   ProcessWebhookEventJobData,
   void,
   PaymentJobName.PROCESS_WEBHOOK_EVENT
+>;
+
+type RunPaymentReconciliationJob = Job<
+  RunPaymentReconciliationJobData,
+  void,
+  PaymentJobName.RUN_PAYMENT_RECONCILIATION
+>;
+
+type PaymentWorkerJob = Job<
+  ProcessWebhookEventJobData | RunPaymentReconciliationJobData,
+  void,
+  PaymentJobName
 >;
 
 @Injectable()
@@ -52,6 +70,8 @@ export class PaymentsProcessor implements OnModuleInit, OnModuleDestroy {
   constructor(
     @Inject(QUEUE_CONNECTION_OPTIONS)
     private readonly connection: QueueConnectionOptions,
+    @Inject(PAYMENTS_QUEUE)
+    private readonly paymentsQueue: Queue,
     @Inject(DEAD_LETTER_QUEUE)
     private readonly deadLetterQueue: Queue,
     private readonly config: ConfigService,
@@ -105,8 +125,15 @@ export class PaymentsProcessor implements OnModuleInit, OnModuleDestroy {
 
     this.worker = new Worker(
       QueueName.PAYMENTS,
-      async (job: ProcessWebhookEventJob) => {
-        const webhookEventId = this.getWebhookEventId(job);
+      async (job: PaymentWorkerJob) => {
+        if (job.name === PaymentJobName.RUN_PAYMENT_RECONCILIATION) {
+          await this.paymentsService.processReconciliationJob(
+            job.data as RunPaymentReconciliationJobData,
+          );
+          return;
+        }
+
+        const webhookEventId = this.getWebhookEventId(job as ProcessWebhookEventJob);
 
         if (!webhookEventId) {
           throw new Error('Missing webhookEventId in queued payment job');
@@ -129,6 +156,7 @@ export class PaymentsProcessor implements OnModuleInit, OnModuleDestroy {
       connection: this.connection,
     });
     await this.queueEvents.waitUntilReady();
+    await this.paymentsService.enqueueReconciliationRun('scheduled');
 
     this.logger.log(`Payments worker started with concurrency=${concurrency}`);
   }
