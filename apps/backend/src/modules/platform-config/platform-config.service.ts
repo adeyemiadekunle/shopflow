@@ -6,13 +6,31 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, ObjectLiteral, Repository } from 'typeorm';
 import { PlatformConfig } from './entities/platform-config.entity';
 import {
   PlatformConfigKey,
   PlatformConfigKeyType,
 } from './constants/platform-config.keys';
 import { PaymentProvider } from '../payments/enums/payment-provider.enum';
+import { User } from '../users/entities/user.entity';
+import { UserRole } from '../users/enums/user-role.enum';
+import { SellerProfile } from '../sellers/entities/seller-profile.entity';
+import { SellerStatus } from '../sellers/enums/seller-status.enum';
+import { Order } from '../orders/entities/order.entity';
+import { OrderStatus } from '../orders/enums/order-status.enum';
+import { Payout, PayoutStatus } from '../payouts/entities/payout.entity';
+import { Refund, RefundStatus } from '../refunds/entities/refund.entity';
+import { LedgerAccount } from '../ledger/entities/ledger-account.entity';
+import { LedgerAccountType } from '../ledger/enums/ledger.enum';
+import {
+  PaymentIntent,
+  PaymentIntentStatus,
+} from '../payments/entities/payment-intent.entity';
+import {
+  PaymentReconciliationIssue,
+  PaymentReconciliationIssueStatus,
+} from '../payments/entities/payment-reconciliation-issue.entity';
 
 @Injectable()
 export class PlatformConfigService implements OnModuleInit {
@@ -24,8 +42,65 @@ export class PlatformConfigService implements OnModuleInit {
   constructor(
     @InjectRepository(PlatformConfig)
     private readonly configRepo: Repository<PlatformConfig>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
+    @InjectRepository(SellerProfile)
+    private readonly sellerRepo: Repository<SellerProfile>,
+    @InjectRepository(Order)
+    private readonly orderRepo: Repository<Order>,
+    @InjectRepository(Payout)
+    private readonly payoutRepo: Repository<Payout>,
+    @InjectRepository(Refund)
+    private readonly refundRepo: Repository<Refund>,
+    @InjectRepository(LedgerAccount)
+    private readonly ledgerAccountRepo: Repository<LedgerAccount>,
+    @InjectRepository(PaymentIntent)
+    private readonly paymentIntentRepo: Repository<PaymentIntent>,
+    @InjectRepository(PaymentReconciliationIssue)
+    private readonly reconciliationIssueRepo: Repository<PaymentReconciliationIssue>,
     private readonly configService: ConfigService,
   ) {}
+
+  private readonly gmvStatuses = [
+    OrderStatus.PAID,
+    OrderStatus.SELLER_PREPARING,
+    OrderStatus.SHIPPED,
+    OrderStatus.DELIVERED_PENDING_CONFIRMATION,
+    OrderStatus.COMPLETED,
+    OrderStatus.DISPUTE_OPEN,
+    OrderStatus.REFUND_PENDING,
+    OrderStatus.REFUNDED,
+  ];
+
+  private normalizeAggregateNumber(
+    value: string | number | null | undefined,
+  ): number {
+    return Number(value ?? 0);
+  }
+
+  private async sumColumn<T extends ObjectLiteral>(
+    repo: Repository<T>,
+    column: string,
+    alias: string,
+    where?: Record<string, unknown>,
+  ): Promise<number> {
+    const qb = repo
+      .createQueryBuilder(alias)
+      .select(`COALESCE(SUM(${alias}.${column}), 0)`, 'total');
+
+    if (where) {
+      for (const [key, value] of Object.entries(where)) {
+        if (Array.isArray(value)) {
+          qb.andWhere(`${alias}.${key} IN (:...${key})`, { [key]: value });
+        } else {
+          qb.andWhere(`${alias}.${key} = :${key}`, { [key]: value });
+        }
+      }
+    }
+
+    const result = (await qb.getRawOne()) as { total?: string | number };
+    return this.normalizeAggregateNumber(result?.total);
+  }
 
   async onModuleInit(): Promise<void> {
     await this.seedDefaults();
@@ -164,6 +239,230 @@ export class PlatformConfigService implements OnModuleInit {
 
   findAll(): Promise<PlatformConfig[]> {
     return this.configRepo.find({ order: { key: 'ASC' } });
+  }
+
+  async getAdminAnalytics() {
+    const [
+      totalUsers,
+      totalBuyers,
+      totalSellers,
+      totalAdmins,
+      verifiedUsers,
+      activeUsers,
+      sellerApproved,
+      sellerPending,
+      sellerSuspended,
+      sellerRejected,
+      totalOrders,
+      completedOrders,
+      cancelledOrders,
+      disputeOpenOrders,
+      refundedOrders,
+      paymentPendingOrders,
+      grossMerchandiseValue,
+      totalRefunds,
+      totalPayouts,
+      pendingPayoutCount,
+      pendingRefundCount,
+      pendingPaymentCount,
+      openReconciliationIssues,
+      defaultCheckoutProvider,
+      defaultPayoutProvider,
+      supportedPaymentGateways,
+      returnPolicyDays,
+      minPayoutAmount,
+      supportEmail,
+      recentOrders,
+      recentPayouts,
+      recentRefunds,
+      topSellerRows,
+      ledgerAccounts,
+    ] = await Promise.all([
+      this.userRepo.count(),
+      this.userRepo.count({ where: { role: UserRole.BUYER } }),
+      this.userRepo.count({ where: { role: UserRole.SELLER } }),
+      this.userRepo.count({ where: { role: UserRole.ADMIN } }),
+      this.userRepo.count({ where: { isEmailVerified: true } }),
+      this.userRepo.count({ where: { isActive: true } }),
+      this.sellerRepo.count({ where: { status: SellerStatus.APPROVED } }),
+      this.sellerRepo.count({ where: { status: SellerStatus.PENDING } }),
+      this.sellerRepo.count({ where: { status: SellerStatus.SUSPENDED } }),
+      this.sellerRepo.count({ where: { status: SellerStatus.REJECTED } }),
+      this.orderRepo.count(),
+      this.orderRepo.count({ where: { status: OrderStatus.COMPLETED } }),
+      this.orderRepo.count({ where: { status: OrderStatus.CANCELLED } }),
+      this.orderRepo.count({ where: { status: OrderStatus.DISPUTE_OPEN } }),
+      this.orderRepo.count({ where: { status: OrderStatus.REFUNDED } }),
+      this.orderRepo.count({ where: { status: OrderStatus.PAYMENT_PENDING } }),
+      this.sumColumn(this.orderRepo, 'totalAmount', 'order', {
+        status: this.gmvStatuses,
+      }),
+      this.sumColumn(this.refundRepo, 'amount', 'refund', {
+        status: RefundStatus.PROCESSED,
+      }),
+      this.sumColumn(this.payoutRepo, 'amount', 'payout', {
+        status: PayoutStatus.SUCCEEDED,
+      }),
+      this.payoutRepo.count({
+        where: { status: In([PayoutStatus.REQUESTED, PayoutStatus.APPROVED, PayoutStatus.PROCESSING]) },
+      }),
+      this.refundRepo.count({
+        where: { status: In([RefundStatus.PENDING, RefundStatus.PROCESSING, RefundStatus.NEEDS_ATTENTION]) },
+      }),
+      this.paymentIntentRepo.count({
+        where: { status: In([PaymentIntentStatus.PENDING, PaymentIntentStatus.PROCESSING]) },
+      }),
+      this.reconciliationIssueRepo.count({
+        where: { status: PaymentReconciliationIssueStatus.OPEN },
+      }),
+      this.getDefaultCheckoutProvider(),
+      this.getDefaultPayoutProvider(),
+      this.getSupportedPaymentGateways(),
+      this.getReturnPolicyDays(),
+      this.getMinPayoutAmount(),
+      this.get(PlatformConfigKey.SUPPORT_EMAIL),
+      this.orderRepo.find({
+        order: { createdAt: 'DESC' },
+        take: 5,
+      }),
+      this.payoutRepo.find({
+        order: { createdAt: 'DESC' },
+        take: 5,
+      }),
+      this.refundRepo.find({
+        order: { createdAt: 'DESC' },
+        take: 5,
+      }),
+      this.orderRepo
+        .createQueryBuilder('order')
+        .select('order.sellerProfileId', 'sellerProfileId')
+        .addSelect('COALESCE(SUM(order.totalAmount), 0)', 'grossSales')
+        .addSelect('COUNT(order.id)', 'orderCount')
+        .where('order.status IN (:...statuses)', { statuses: this.gmvStatuses })
+        .groupBy('order.sellerProfileId')
+        .orderBy('grossSales', 'DESC')
+        .limit(5)
+        .getRawMany(),
+      this.ledgerAccountRepo.find(),
+    ]);
+
+    const topSellerIds = topSellerRows
+      .map((row) => row.sellerProfileId as string | undefined)
+      .filter((value): value is string => Boolean(value));
+    const topSellerProfiles =
+      topSellerIds.length > 0
+        ? await this.sellerRepo.find({ where: { id: In(topSellerIds) } })
+        : [];
+    const sellerById = new Map(topSellerProfiles.map((seller) => [seller.id, seller]));
+
+    const balanceByType = new Map<LedgerAccountType, number>();
+    for (const account of ledgerAccounts) {
+      balanceByType.set(
+        account.type,
+        (balanceByType.get(account.type) ?? 0) + Number(account.balance ?? 0),
+      );
+    }
+
+    return {
+      platform: {
+        name: this.getPlatformName(),
+        marketName: this.getMarketName(),
+        countryCode: this.getCountryCode(),
+        currency: this.getCurrency(),
+        supportEmail: supportEmail ?? 'support@rands.ng',
+      },
+      config: {
+        defaultCheckoutProvider,
+        defaultPayoutProvider,
+        supportedPaymentGateways,
+        returnPolicyDays,
+        minPayoutAmount,
+      },
+      overview: {
+        totalUsers,
+        totalBuyers,
+        totalSellers,
+        totalAdmins,
+        verifiedUsers,
+        activeUsers,
+        totalOrders,
+        completedOrders,
+        cancelledOrders,
+        disputeOpenOrders,
+        refundedOrders,
+        paymentPendingOrders,
+        grossMerchandiseValue,
+        totalRefunds,
+        totalPayouts,
+      },
+      sellers: {
+        approved: sellerApproved,
+        pending: sellerPending,
+        suspended: sellerSuspended,
+        rejected: sellerRejected,
+      },
+      finance: {
+        sellerPendingLiability:
+          balanceByType.get(LedgerAccountType.SELLER_PENDING) ?? 0,
+        sellerAvailableLiability:
+          balanceByType.get(LedgerAccountType.SELLER_AVAILABLE) ?? 0,
+        refundReserveBalance:
+          balanceByType.get(LedgerAccountType.REFUND_RESERVE) ?? 0,
+        payoutPayableBalance:
+          balanceByType.get(LedgerAccountType.PAYOUT_PAYABLE) ?? 0,
+        platformCashClearingBalance:
+          balanceByType.get(LedgerAccountType.PLATFORM_CASH_CLEARING) ?? 0,
+        platformRevenueBalance:
+          balanceByType.get(LedgerAccountType.PLATFORM_REVENUE) ?? 0,
+      },
+      operations: {
+        pendingPayoutCount,
+        pendingRefundCount,
+        pendingPaymentCount,
+        openReconciliationIssues,
+      },
+      topSellers: topSellerRows.map((row) => {
+        const seller = sellerById.get(row.sellerProfileId);
+        return {
+          sellerProfileId: row.sellerProfileId,
+          storeName: seller?.storeName ?? 'Unknown store',
+          storeSlug: seller?.storeSlug,
+          grossSales: this.normalizeAggregateNumber(row.grossSales),
+          orderCount: this.normalizeAggregateNumber(row.orderCount),
+          status: seller?.status,
+        };
+      }),
+      recentOrders: recentOrders.map((order) => ({
+        id: order.id,
+        orderReference: order.orderReference,
+        sellerProfileId: order.sellerProfileId,
+        buyerId: order.buyerId,
+        status: order.status,
+        totalAmount: Number(order.totalAmount),
+        currency: order.currency,
+        createdAt: order.createdAt,
+      })),
+      recentPayouts: recentPayouts.map((payout) => ({
+        id: payout.id,
+        sellerProfileId: payout.sellerProfileId,
+        reference: payout.reference,
+        provider: payout.provider,
+        status: payout.status,
+        amount: Number(payout.amount),
+        currency: payout.currency,
+        createdAt: payout.createdAt,
+      })),
+      recentRefunds: recentRefunds.map((refund) => ({
+        id: refund.id,
+        orderId: refund.orderId,
+        paymentIntentId: refund.paymentIntentId,
+        provider: refund.provider,
+        status: refund.status,
+        amount: Number(refund.amount),
+        currency: refund.currency,
+        createdAt: refund.createdAt,
+      })),
+    };
   }
 
   async set(

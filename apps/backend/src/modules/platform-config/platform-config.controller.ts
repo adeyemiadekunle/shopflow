@@ -56,6 +56,13 @@ export class PlatformConfigController {
     return this.service.findAll();
   }
 
+  @Get('admin/analytics')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Get platform analytics summary for the admin dashboard' })
+  getAdminAnalytics() {
+    return this.service.getAdminAnalytics();
+  }
+
   @Put(':key')
   @Roles(UserRole.ADMIN)
   @ApiOperation({
