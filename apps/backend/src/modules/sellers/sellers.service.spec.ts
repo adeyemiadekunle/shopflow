@@ -6,6 +6,12 @@ import { SellerKyc } from './entities/seller-kyc.entity';
 import { BankAccount } from './entities/bank-account.entity';
 import { PaystackService } from '../payments/paystack.service';
 import { SellerStatus } from './enums/seller-status.enum';
+import { Order } from '../orders/entities/order.entity';
+import { OrderStatus } from '../orders/enums/order-status.enum';
+import { Payout, PayoutStatus } from '../payouts/entities/payout.entity';
+import { Refund, RefundStatus } from '../refunds/entities/refund.entity';
+import { LedgerAccount } from '../ledger/entities/ledger-account.entity';
+import { LedgerAccountType } from '../ledger/enums/ledger.enum';
 
 describe('SellersService', () => {
   let service: SellersService;
@@ -25,6 +31,22 @@ describe('SellersService', () => {
   const mockBankAccountRepo = {
     findOne: jest.fn(),
     save: jest.fn(),
+  };
+
+  const mockOrderRepo = {
+    find: jest.fn(),
+  };
+
+  const mockPayoutRepo = {
+    find: jest.fn(),
+  };
+
+  const mockRefundRepo = {
+    find: jest.fn(),
+  };
+
+  const mockLedgerAccountRepo = {
+    find: jest.fn(),
   };
 
   const mockPaystackService = {
@@ -48,6 +70,22 @@ describe('SellersService', () => {
         {
           provide: getRepositoryToken(BankAccount),
           useValue: mockBankAccountRepo,
+        },
+        {
+          provide: getRepositoryToken(Order),
+          useValue: mockOrderRepo,
+        },
+        {
+          provide: getRepositoryToken(Payout),
+          useValue: mockPayoutRepo,
+        },
+        {
+          provide: getRepositoryToken(Refund),
+          useValue: mockRefundRepo,
+        },
+        {
+          provide: getRepositoryToken(LedgerAccount),
+          useValue: mockLedgerAccountRepo,
         },
         { provide: PaystackService, useValue: mockPaystackService },
       ],
@@ -157,5 +195,146 @@ describe('SellersService', () => {
         storeSlug: 'taken-slug',
       }),
     ).rejects.toThrow('Store slug is already in use');
+  });
+
+  it('getAnalytics() should return seller dashboard totals from orders, payouts, refunds, and ledger balances', async () => {
+    mockSellerRepo.findOne.mockResolvedValue({
+      id: 'seller-1',
+      userId: 'user-1',
+      storeName: 'Tola Store',
+      storeSlug: 'tola-store',
+    });
+    mockOrderRepo.find.mockResolvedValue([
+      {
+        id: 'order-1',
+        orderReference: 'RND-001',
+        sellerProfileId: 'seller-1',
+        status: OrderStatus.COMPLETED,
+        totalAmount: 12000,
+        currency: 'NGN',
+        createdAt: new Date('2026-03-01T10:00:00Z'),
+        paidAt: new Date('2026-03-01T10:05:00Z'),
+        deliveredAt: new Date('2026-03-03T12:00:00Z'),
+        items: [
+          {
+            productId: 'product-1',
+            quantity: 2,
+            lineTotal: 8000,
+            productSnapshot: { title: 'Ankara Gown' },
+          },
+        ],
+      },
+      {
+        id: 'order-2',
+        orderReference: 'RND-002',
+        sellerProfileId: 'seller-1',
+        status: OrderStatus.REFUNDED,
+        totalAmount: 5000,
+        currency: 'NGN',
+        createdAt: new Date('2026-03-02T10:00:00Z'),
+        items: [
+          {
+            productId: 'product-2',
+            quantity: 1,
+            lineTotal: 5000,
+            productSnapshot: { title: 'Native Cap' },
+          },
+        ],
+      },
+      {
+        id: 'order-3',
+        orderReference: 'RND-003',
+        sellerProfileId: 'seller-1',
+        status: OrderStatus.DISPUTE_OPEN,
+        totalAmount: 7000,
+        currency: 'NGN',
+        createdAt: new Date('2026-03-04T10:00:00Z'),
+        items: [
+          {
+            productId: 'product-1',
+            quantity: 1,
+            lineTotal: 7000,
+            productSnapshot: { title: 'Ankara Gown' },
+          },
+        ],
+      },
+      {
+        id: 'order-4',
+        orderReference: 'RND-004',
+        sellerProfileId: 'seller-1',
+        status: OrderStatus.CANCELLED,
+        totalAmount: 3000,
+        currency: 'NGN',
+        createdAt: new Date('2026-03-05T10:00:00Z'),
+        items: [],
+      },
+    ]);
+    mockPayoutRepo.find.mockResolvedValue([
+      {
+        id: 'payout-1',
+        reference: 'PAY-001',
+        status: PayoutStatus.SUCCEEDED,
+        amount: 10000,
+        currency: 'NGN',
+        createdAt: new Date('2026-03-06T10:00:00Z'),
+        processedAt: new Date('2026-03-06T11:00:00Z'),
+      },
+    ]);
+    mockRefundRepo.find.mockResolvedValue([
+      {
+        id: 'refund-1',
+        orderId: 'order-2',
+        status: RefundStatus.PROCESSED,
+        amount: 5000,
+        currency: 'NGN',
+        createdAt: new Date('2026-03-07T10:00:00Z'),
+        processedAt: new Date('2026-03-07T11:00:00Z'),
+        order: { sellerProfileId: 'seller-1' },
+      },
+      {
+        id: 'refund-2',
+        orderId: 'order-x',
+        status: RefundStatus.PROCESSED,
+        amount: 2500,
+        currency: 'NGN',
+        createdAt: new Date('2026-03-08T10:00:00Z'),
+        order: { sellerProfileId: 'seller-2' },
+      },
+    ]);
+    mockLedgerAccountRepo.find.mockResolvedValue([
+      {
+        type: LedgerAccountType.SELLER_PENDING,
+        balance: 2000,
+      },
+      {
+        type: LedgerAccountType.SELLER_AVAILABLE,
+        balance: 15000,
+      },
+    ]);
+
+    const analytics = await service.getAnalytics('user-1');
+
+    expect(analytics.overview.totalOrders).toBe(4);
+    expect(analytics.overview.paidOrders).toBe(2);
+    expect(analytics.overview.completedOrders).toBe(1);
+    expect(analytics.overview.cancelledOrders).toBe(1);
+    expect(analytics.overview.openDisputes).toBe(1);
+    expect(analytics.overview.refundedOrders).toBe(1);
+    expect(analytics.overview.grossSales).toBe(24000);
+    expect(analytics.overview.totalRefunds).toBe(5000);
+    expect(analytics.overview.totalPayouts).toBe(10000);
+    expect(analytics.overview.pendingFunds).toBe(2000);
+    expect(analytics.overview.availableFunds).toBe(15000);
+    expect(analytics.topProducts[0]).toEqual(
+      expect.objectContaining({
+        productId: 'product-1',
+        title: 'Ankara Gown',
+        quantitySold: 3,
+        revenue: 15000,
+      }),
+    );
+    expect(analytics.recentOrders).toHaveLength(4);
+    expect(analytics.recentPayouts).toHaveLength(1);
+    expect(analytics.recentRefunds).toHaveLength(1);
   });
 });

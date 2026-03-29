@@ -41,6 +41,13 @@ export class SellersController {
     return this.sellersService.getOnboardingStatus(user.id);
   }
 
+  @Get('me/analytics')
+  @Roles(UserRole.SELLER)
+  @ApiOperation({ summary: 'Get seller analytics summary for dashboard use' })
+  getMyAnalytics(@CurrentUser() user: AuthenticatedUser) {
+    return this.sellersService.getAnalytics(user.id);
+  }
+
   @Patch('me/kyc')
   @Roles(UserRole.SELLER)
   @ApiOperation({ summary: 'Create or update seller KYC and business details' })
