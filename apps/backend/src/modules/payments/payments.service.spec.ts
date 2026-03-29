@@ -6,10 +6,12 @@ import {
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { LedgerService } from '../ledger/ledger.service';
 import { FulfilmentEvent } from '../orders/entities/fulfilment-event.entity';
 import { Order } from '../orders/entities/order.entity';
 import { OrderStatus } from '../orders/enums/order-status.enum';
 import { PAYMENTS_QUEUE } from '../queue/queue.constants';
+import { PayoutsService } from '../payouts/payouts.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { UsersService } from '../users/users.service';
 import {
@@ -114,7 +116,17 @@ describe('PaymentsService', () => {
     findById: jest.fn(),
   };
 
+  const mockLedgerService = {
+    ensureAccount: jest.fn().mockResolvedValue(undefined),
+    hasRecordedReference: jest.fn().mockResolvedValue(false),
+    record: jest.fn().mockResolvedValue(undefined),
+  };
+
   const mockSubscriptionsService = {
+    processPaystackWebhook: jest.fn(),
+  };
+
+  const mockPayoutsService = {
     processPaystackWebhook: jest.fn(),
   };
 
@@ -135,6 +147,7 @@ describe('PaymentsService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockLedgerService.hasRecordedReference.mockResolvedValue(false);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -167,9 +180,14 @@ describe('PaymentsService', () => {
         { provide: ConfigService, useValue: mockConfigService },
         { provide: PaystackService, useValue: mockPaystackService },
         { provide: UsersService, useValue: mockUsersService },
+        { provide: LedgerService, useValue: mockLedgerService },
         {
           provide: SubscriptionsService,
           useValue: mockSubscriptionsService,
+        },
+        {
+          provide: PayoutsService,
+          useValue: mockPayoutsService,
         },
       ],
     }).compile();
@@ -273,7 +291,11 @@ describe('PaymentsService', () => {
     });
     mockOrderRepo.findOne.mockResolvedValue({
       id: 'order-1',
+      orderReference: 'RND-100',
       buyerId: 'buyer-1',
+      sellerProfileId: 'seller-1',
+      totalAmount: 19800,
+      currency: 'NGN',
       status: OrderStatus.PAYMENT_PENDING,
     });
 
@@ -292,6 +314,7 @@ describe('PaymentsService', () => {
         status: OrderStatus.PAID,
       }),
     );
+    expect(mockLedgerService.record).toHaveBeenCalledTimes(2);
     expect(mockFulfilmentEventRepo.save).toHaveBeenCalled();
   });
 
@@ -359,6 +382,15 @@ describe('PaymentsService', () => {
     };
 
     mockPaymentIntentRepo.findOne.mockResolvedValue(succeededIntent);
+    mockOrderRepo.findOne.mockResolvedValue({
+      id: 'order-1',
+      orderReference: 'RND-100',
+      buyerId: 'buyer-1',
+      sellerProfileId: 'seller-1',
+      totalAmount: 19800,
+      currency: 'NGN',
+      status: OrderStatus.PAYMENT_PENDING,
+    });
     mockPaystackService.verifyTransaction.mockResolvedValue({
       status: 'success',
       reference: 'PAY-RND-100-TESTREF',
@@ -385,8 +417,14 @@ describe('PaymentsService', () => {
 
     expect(result.paymentIntent).toBe(succeededIntent);
     expect(mockPaymentIntentRepo.save).not.toHaveBeenCalled();
-    expect(mockOrderRepo.save).not.toHaveBeenCalled();
-    expect(mockFulfilmentEventRepo.save).not.toHaveBeenCalled();
+    expect(mockOrderRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'order-1',
+        status: OrderStatus.PAID,
+      }),
+    );
+    expect(mockLedgerService.record).toHaveBeenCalledTimes(2);
+    expect(mockFulfilmentEventRepo.save).toHaveBeenCalled();
   });
 
   it('enqueueWebhook() should persist and queue an unprocessed webhook event', async () => {
@@ -556,7 +594,11 @@ describe('PaymentsService', () => {
     ]);
     mockOrderRepo.findOne.mockResolvedValue({
       id: 'order-1',
+      orderReference: 'RND-100',
       buyerId: 'buyer-1',
+      sellerProfileId: 'seller-1',
+      totalAmount: 19800,
+      currency: 'NGN',
       status: OrderStatus.PAYMENT_PENDING,
     });
     mockReconciliationIssueRepo.findOne.mockResolvedValue(null);
@@ -606,7 +648,11 @@ describe('PaymentsService', () => {
     ]);
     mockOrderRepo.findOne.mockResolvedValue({
       id: 'order-2',
+      orderReference: 'RND-200',
       buyerId: 'buyer-1',
+      sellerProfileId: 'seller-1',
+      totalAmount: 2500,
+      currency: 'NGN',
       status: OrderStatus.PAID,
     });
     mockReconciliationIssueRepo.findOne.mockResolvedValue(null);

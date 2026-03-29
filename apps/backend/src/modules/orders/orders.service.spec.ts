@@ -8,10 +8,13 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Product } from '../catalog/entities/product.entity';
 import { ProductVariant } from '../catalog/entities/product-variant.entity';
+import { LedgerService } from '../ledger/ledger.service';
+import { PlatformConfigService } from '../platform-config/platform-config.service';
 import { ORDERS_QUEUE } from '../queue/queue.constants';
 import { SellersService } from '../sellers/sellers.service';
 import { UserRole } from '../users/enums/user-role.enum';
 import { DeliveryQuote, QuoteStatus } from './entities/delivery-quote.entity';
+import { DisputeCase, DisputeStatus } from './entities/dispute-case.entity';
 import {
   FulfilmentEvent,
   FulfilmentEventType,
@@ -38,6 +41,10 @@ describe('OrdersService', () => {
     totalAmount: 10500,
     currency: 'NGN',
     deliveryAddress: { addressLine1: '12 Allen Avenue' },
+    deliveredAt: undefined,
+    buyerConfirmedAt: undefined,
+    fundsHeldUntil: undefined,
+    fundsReleasedAt: undefined,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -88,8 +95,30 @@ describe('OrdersService', () => {
     find: jest.fn(),
   };
 
+  const mockDisputeRepo = {
+    findOne: jest.fn(),
+    save: jest
+      .fn()
+      .mockImplementation((value: Record<string, unknown>) =>
+        Promise.resolve(value),
+      ),
+    create: jest
+      .fn()
+      .mockImplementation((value: Record<string, unknown>) => value),
+  };
+
   const mockSellersService = {
     getByUserIdOrThrow: jest.fn(),
+  };
+
+  const mockPlatformConfigService = {
+    getReturnPolicyDays: jest.fn().mockResolvedValue(7),
+  };
+
+  const mockLedgerService = {
+    ensureAccount: jest.fn().mockResolvedValue(undefined),
+    hasRecordedReference: jest.fn().mockResolvedValue(false),
+    record: jest.fn().mockResolvedValue(undefined),
   };
 
   const mockOrdersQueue = {
@@ -117,6 +146,8 @@ describe('OrdersService', () => {
     mockOrderRepo.findOne.mockResolvedValue(mockOrder);
     mockOrderRepo.find.mockResolvedValue([mockOrder]);
     mockOrdersQueue.add.mockResolvedValue({});
+    mockDisputeRepo.findOne.mockResolvedValue(null);
+    mockLedgerService.hasRecordedReference.mockResolvedValue(false);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -131,6 +162,7 @@ describe('OrdersService', () => {
           provide: getRepositoryToken(FulfilmentEvent),
           useValue: mockEventRepo,
         },
+        { provide: getRepositoryToken(DisputeCase), useValue: mockDisputeRepo },
         { provide: getRepositoryToken(Product), useValue: mockProductRepo },
         {
           provide: getRepositoryToken(ProductVariant),
@@ -139,6 +171,11 @@ describe('OrdersService', () => {
         { provide: ORDERS_QUEUE, useValue: mockOrdersQueue },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: SellersService, useValue: mockSellersService },
+        {
+          provide: PlatformConfigService,
+          useValue: mockPlatformConfigService,
+        },
+        { provide: LedgerService, useValue: mockLedgerService },
       ],
     }).compile();
 
@@ -427,6 +464,145 @@ describe('OrdersService', () => {
     await expect(service.cancelByBuyer('buyer-1', 'order-1')).rejects.toThrow(
       BadRequestException,
     );
+  });
+
+  it('markDelivered() should set the hold window and queue fund release', async () => {
+    mockSellersService.getByUserIdOrThrow.mockResolvedValue({ id: 'seller-1' });
+    mockOrderRepo.findOne
+      .mockResolvedValueOnce({
+        ...mockOrder,
+        status: OrderStatus.SHIPPED,
+      })
+      .mockResolvedValueOnce({
+        ...mockOrder,
+        status: OrderStatus.DELIVERED_PENDING_CONFIRMATION,
+      });
+
+    const order = await service.markDelivered('seller-user-1', 'order-1', {
+      notes: 'Package handed over to buyer',
+    });
+
+    expect(mockOrderRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'order-1',
+        status: OrderStatus.DELIVERED_PENDING_CONFIRMATION,
+      }),
+    );
+    expect(mockOrdersQueue.add).toHaveBeenCalledWith(
+      'release-held-order-funds',
+      { orderId: 'order-1' },
+      expect.objectContaining({
+        jobId: 'release-held-order-funds:order-1',
+      }),
+    );
+    expect(order.status).toBe(OrderStatus.DELIVERED_PENDING_CONFIRMATION);
+  });
+
+  it('openDispute() should move a delivered order into dispute_open', async () => {
+    mockOrderRepo.findOne
+      .mockResolvedValueOnce({
+        ...mockOrder,
+        status: OrderStatus.DELIVERED_PENDING_CONFIRMATION,
+      })
+      .mockResolvedValueOnce({
+        ...mockOrder,
+        status: OrderStatus.DISPUTE_OPEN,
+      });
+    mockDisputeRepo.save.mockResolvedValue({
+      id: 'dispute-1',
+      orderId: 'order-1',
+      status: DisputeStatus.OPEN,
+    });
+
+    const order = await service.openDispute('buyer-1', 'order-1', {
+      reason: 'The item delivered does not match the description.',
+      evidenceUrls: ['https://example.com/evidence-1.jpg'],
+    });
+
+    expect(mockDisputeRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderId: 'order-1',
+        raisedById: 'buyer-1',
+        status: DisputeStatus.OPEN,
+      }),
+    );
+    expect(mockOrderRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'order-1',
+        status: OrderStatus.DISPUTE_OPEN,
+      }),
+    );
+    expect(order.status).toBe(OrderStatus.DISPUTE_OPEN);
+  });
+
+  it('resolveDispute() should release held funds when admin resolves for seller', async () => {
+    mockDisputeRepo.findOne
+      .mockResolvedValueOnce({
+        id: 'dispute-1',
+        orderId: 'order-1',
+        status: DisputeStatus.OPEN,
+      })
+      .mockResolvedValueOnce(null);
+    mockOrderRepo.findOne.mockReset();
+    mockOrderRepo.findOne
+      .mockResolvedValueOnce({
+        ...mockOrder,
+        status: OrderStatus.DISPUTE_OPEN,
+      })
+      .mockResolvedValueOnce({
+        ...mockOrder,
+        status: OrderStatus.DISPUTE_OPEN,
+      })
+      .mockResolvedValueOnce({
+        ...mockOrder,
+        status: OrderStatus.COMPLETED,
+      });
+
+    const order = await service.resolveDispute('dispute-1', 'admin-1', {
+      outcome: 'seller' as const,
+      resolutionNotes: 'Buyer evidence was not sufficient.',
+    });
+
+    expect(mockLedgerService.record).toHaveBeenCalledTimes(2);
+    expect(mockOrderRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'order-1',
+        status: OrderStatus.COMPLETED,
+      }),
+    );
+    expect(order.status).toBe(OrderStatus.COMPLETED);
+  });
+
+  it('resolveDispute() should move seller funds into refund reserve for buyer-favour outcomes', async () => {
+    mockDisputeRepo.findOne.mockResolvedValueOnce({
+      id: 'dispute-2',
+      orderId: 'order-1',
+      status: DisputeStatus.OPEN,
+    });
+    mockOrderRepo.findOne.mockReset();
+    mockOrderRepo.findOne
+      .mockResolvedValueOnce({
+        ...mockOrder,
+        status: OrderStatus.DISPUTE_OPEN,
+      })
+      .mockResolvedValueOnce({
+        ...mockOrder,
+        status: OrderStatus.REFUNDED,
+      });
+
+    const order = await service.resolveDispute('dispute-2', 'admin-1', {
+      outcome: 'buyer' as const,
+      resolutionNotes: 'Admin approved a buyer-favour resolution.',
+    });
+
+    expect(mockLedgerService.record).toHaveBeenCalledTimes(2);
+    expect(mockOrderRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'order-1',
+        status: OrderStatus.REFUNDED,
+      }),
+    );
+    expect(order.status).toBe(OrderStatus.REFUNDED);
   });
 
   it('findForUser() should block unrelated buyers from accessing the order', async () => {

@@ -88,6 +88,18 @@ export class Order {
   @Column({ name: 'paid_at', type: 'timestamp', nullable: true })
   paidAt?: Date;
 
+  @Column({ name: 'delivered_at', type: 'timestamp', nullable: true })
+  deliveredAt?: Date;
+
+  @Column({ name: 'buyer_confirmed_at', type: 'timestamp', nullable: true })
+  buyerConfirmedAt?: Date;
+
+  @Column({ name: 'funds_held_until', type: 'timestamp', nullable: true })
+  fundsHeldUntil?: Date;
+
+  @Column({ name: 'funds_released_at', type: 'timestamp', nullable: true })
+  fundsReleasedAt?: Date;
+
   @Column({ name: 'completed_at', type: 'timestamp', nullable: true })
   completedAt?: Date;
 

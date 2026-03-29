@@ -14,6 +14,7 @@ import {
   QUEUE_CONNECTION_OPTIONS,
 } from '../queue/queue.constants';
 import { OrderStatus } from './enums/order-status.enum';
+import { OrdersService } from './orders.service';
 
 describe('OrdersProcessor', () => {
   let processor: OrdersProcessor;
@@ -51,6 +52,10 @@ describe('OrdersProcessor', () => {
     sendSellerQuoteResponseEmail: jest.fn(),
   };
 
+  const mockOrdersService = {
+    releaseHeldFundsFromQueue: jest.fn().mockResolvedValue(undefined),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -80,6 +85,7 @@ describe('OrdersProcessor', () => {
           useValue: { get: jest.fn().mockReturnValue(1) },
         },
         { provide: MailService, useValue: mockMailService },
+        { provide: OrdersService, useValue: mockOrdersService },
       ],
     }).compile();
 
@@ -148,6 +154,16 @@ describe('OrdersProcessor', () => {
         id: 'order-1',
         status: OrderStatus.CANCELLED,
       }),
+    );
+  });
+
+  it('releases held order funds through the orders service', async () => {
+    await (processor as any).processHeldFundsRelease({
+      data: { orderId: 'order-1' },
+    });
+
+    expect(mockOrdersService.releaseHeldFundsFromQueue).toHaveBeenCalledWith(
+      'order-1',
     );
   });
 });

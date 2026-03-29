@@ -12,6 +12,7 @@ import { ProductVariant } from '../catalog/entities/product-variant.entity';
 import { MailModule } from '../mail/mail.module';
 import { SellersModule } from '../sellers/sellers.module';
 import { PlatformConfigModule } from '../platform-config/platform-config.module';
+import { LedgerModule } from '../ledger/ledger.module';
 import { Queue, QueueOptions } from 'bullmq';
 import { QueueModule } from '../queue/queue.module';
 import {
@@ -39,6 +40,7 @@ type QueueConnectionOptions = NonNullable<QueueOptions['connection']>;
     ]),
     SellersModule,
     PlatformConfigModule,
+    LedgerModule,
     MailModule,
   ],
   providers: [

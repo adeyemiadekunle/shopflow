@@ -212,7 +212,22 @@ Current order routes:
 | GET | `/orders/seller` | Seller | List seller orders |
 | POST | `/orders/:id/quote` | Seller | Send delivery quote |
 | POST | `/orders/:id/quote-response` | Buyer | Accept or decline quote |
+| POST | `/orders/:id/cancel` | Buyer | Cancel an order before payment is confirmed |
+| POST | `/orders/:id/prepare` | Seller | Move a paid order into seller preparation |
+| POST | `/orders/:id/ship` | Seller | Mark a prepared order as shipped |
+| POST | `/orders/:id/deliver` | Seller | Mark a shipped order as delivered and start the hold window |
+| POST | `/orders/:id/confirm-delivery` | Buyer | Confirm delivery without releasing funds early |
+| POST | `/orders/:id/disputes` | Buyer | Open a dispute before seller funds are released |
+| POST | `/orders/disputes/:disputeId/resolve` | Admin | Resolve a dispute in favour of the buyer or seller |
 | GET | `/orders/:id` | Buyer/Seller/Admin | Get one accessible order |
+
+Settlement rule:
+
+- Successful order payments are allocated to `seller_pending`, not `seller_available`.
+- After the seller marks an order delivered, the platform starts the configured return-policy hold window.
+- Seller funds are released automatically only after the hold window expires with no open dispute.
+- If the buyer opens a dispute, release is blocked until admin resolution.
+- Buyer-favour dispute resolution moves funds into `refund_reserve`; seller-favour resolution releases held funds to the seller.
 
 ### Payments — `/api/v1/payments`
 
@@ -232,6 +247,18 @@ Current payment routes:
 | GET | `/payments/reconciliation/issues` | Admin | List recent payment reconciliation issues |
 | POST | `/payments/webhook` | Public | Paystack webhook receiver |
 
+### Payouts — `/api/v1/payouts`
+
+Admin-managed seller payouts from `seller_available` through Paystack Transfers.
+
+| Method | Route | Auth | Description |
+|---|---|---|---|
+| GET | `/payouts/admin` | Admin | List recent payout records |
+| GET | `/payouts/admin/sellers/:sellerProfileId/summary` | Admin | Get seller balances, primary bank account, and recent payouts |
+| POST | `/payouts/admin` | Admin | Create a payout request for a seller |
+| POST | `/payouts/admin/:id/approve` | Admin | Reserve seller available balance into payout payable |
+| POST | `/payouts/admin/:id/send` | Admin | Send an approved payout through Paystack Transfers |
+
 ### Frontend Checkout Flow
 
 Recommended frontend implementation:
@@ -243,7 +270,9 @@ Recommended frontend implementation:
 5. Backend returns `authorizationUrl`, `reference`, and `accessCode`.
 6. Frontend redirects the buyer to `authorizationUrl`.
 7. After Paystack returns to the frontend, call `POST /api/v1/payments/verify` with the `reference`.
-8. Frontend refreshes the order with `GET /api/v1/orders/:id`.
+8. Seller progresses the order with `/prepare`, `/ship`, and `/deliver`.
+9. Frontend refreshes the order with `GET /api/v1/orders/:id`.
+10. Seller funds remain on hold until the return-policy window passes or any dispute is resolved.
 
 Example checkout init request:
 
@@ -465,7 +494,7 @@ npm run test:watch
 npm run test:cov
 ```
 
-Current test suites: `AppController`, `AuthService`, `LedgerService`, `OrdersService` — 16/16 passing.
+Current test suites: 12 suites, 64/64 tests passing.
 
 ---
 

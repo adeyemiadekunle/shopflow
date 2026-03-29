@@ -53,6 +53,27 @@ export interface PaystackResolveAccountResponse {
   bank_id?: number;
 }
 
+export interface PaystackTransferRecipientResponse {
+  recipient_code: string;
+  type: string;
+  name: string;
+  details?: Record<string, unknown>;
+}
+
+export interface PaystackTransferResponse {
+  id?: number;
+  transfer_code?: string;
+  reference: string;
+  status: string;
+  amount: number;
+  currency: string;
+  recipient?: {
+    recipient_code?: string;
+    type?: string;
+    name?: string;
+  };
+}
+
 @Injectable()
 export class PaystackService {
   private readonly http: AxiosInstance;
@@ -149,6 +170,38 @@ export class PaystackService {
       ...(amountKobo !== undefined && { amount: amountKobo }),
     });
     return data.data;
+  }
+
+  async createTransferRecipient(params: {
+    name: string;
+    accountNumber: string;
+    bankCode: string;
+    currency: string;
+  }): Promise<PaystackTransferRecipientResponse> {
+    const { data } = await this.http.post('/transferrecipient', {
+      type: 'nuban',
+      name: params.name,
+      account_number: params.accountNumber,
+      bank_code: params.bankCode,
+      currency: params.currency,
+    });
+    return data.data as PaystackTransferRecipientResponse;
+  }
+
+  async initiateTransfer(params: {
+    amountKobo: number;
+    recipientCode: string;
+    reference: string;
+    reason?: string;
+  }): Promise<PaystackTransferResponse> {
+    const { data } = await this.http.post('/transfer', {
+      source: 'balance',
+      amount: params.amountKobo,
+      recipient: params.recipientCode,
+      reference: params.reference,
+      reason: params.reason,
+    });
+    return data.data as PaystackTransferResponse;
   }
 
   async disableSubscription(params: {

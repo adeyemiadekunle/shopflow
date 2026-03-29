@@ -13,6 +13,11 @@ import { Queue } from 'bullmq';
 import { Gauge, register } from 'prom-client';
 import { LessThan, Repository } from 'typeorm';
 import { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
+import { LedgerService } from '../ledger/ledger.service';
+import {
+  LedgerAccountType,
+  LedgerEventType,
+} from '../ledger/enums/ledger.enum';
 import {
   FulfilmentEvent,
   FulfilmentEventType,
@@ -23,6 +28,7 @@ import { UsersService } from '../users/users.service';
 import { UserRole } from '../users/enums/user-role.enum';
 import { PAYMENTS_QUEUE, PaymentJobName } from '../queue/queue.constants';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { PayoutsService } from '../payouts/payouts.service';
 import {
   InitializeCheckoutDto,
   PaystackCheckoutChannel,
@@ -92,8 +98,11 @@ export class PaymentsService {
     private readonly config: ConfigService,
     private readonly paystackService: PaystackService,
     private readonly usersService: UsersService,
+    private readonly ledgerService: LedgerService,
     @Inject(forwardRef(() => SubscriptionsService))
     private readonly subscriptionsService: SubscriptionsService,
+    @Inject(forwardRef(() => PayoutsService))
+    private readonly payoutsService: PayoutsService,
   ) {
     const countOpenIssues = this.countOpenReconciliationIssues.bind(this);
     const getLatestRun = this.getLatestReconciliationRun.bind(this);
@@ -400,6 +409,76 @@ export class PaymentsService {
     );
   }
 
+  private getOrderSettlementAmount(order: Order): number {
+    return Number(order.totalAmount);
+  }
+
+  private async recordOrderPaymentSettlement(
+    order: Order,
+    intent: PaymentIntent,
+  ): Promise<void> {
+    const amount = this.getOrderSettlementAmount(order);
+
+    if (amount <= 0) {
+      return;
+    }
+
+    await Promise.all([
+      this.ledgerService.ensureAccount(
+        LedgerAccountType.PLATFORM_CASH_CLEARING,
+        undefined,
+        order.currency,
+      ),
+      this.ledgerService.ensureAccount(
+        LedgerAccountType.SELLER_PENDING,
+        order.sellerProfileId,
+        order.currency,
+      ),
+    ]);
+
+    const paymentCollectedAlreadyRecorded =
+      await this.ledgerService.hasRecordedReference({
+        reference: intent.paystackReference,
+        eventType: LedgerEventType.PAYMENT_COLLECTED,
+        accountType: LedgerAccountType.PLATFORM_CASH_CLEARING,
+      });
+    const sellerPendingAlreadyRecorded =
+      await this.ledgerService.hasRecordedReference({
+        reference: intent.paystackReference,
+        eventType: LedgerEventType.SELLER_PENDING_ALLOCATED,
+        accountType: LedgerAccountType.SELLER_PENDING,
+      });
+
+    if (!paymentCollectedAlreadyRecorded) {
+      await this.ledgerService.record({
+        accountType: LedgerAccountType.PLATFORM_CASH_CLEARING,
+        amount,
+        currency: order.currency,
+        orderId: order.id,
+        paymentId: intent.id,
+        actorId: intent.buyerId,
+        eventType: LedgerEventType.PAYMENT_COLLECTED,
+        reference: intent.paystackReference,
+        notes: `Buyer payment collected for order ${order.orderReference}`,
+      });
+    }
+
+    if (!sellerPendingAlreadyRecorded) {
+      await this.ledgerService.record({
+        accountType: LedgerAccountType.SELLER_PENDING,
+        ownerId: order.sellerProfileId,
+        amount,
+        currency: order.currency,
+        orderId: order.id,
+        paymentId: intent.id,
+        actorId: intent.buyerId,
+        eventType: LedgerEventType.SELLER_PENDING_ALLOCATED,
+        reference: intent.paystackReference,
+        notes: `Seller proceeds placed on hold pending return-policy release for order ${order.orderReference}`,
+      });
+    }
+  }
+
   private async finalizeVerifiedPayment(
     intent: PaymentIntent,
     verifyResponse: PaystackVerifyResponse,
@@ -417,6 +496,11 @@ export class PaymentsService {
     }
 
     if (this.isSameFinalOutcome(intent, verifyResponse)) {
+      if (intent.status === PaymentIntentStatus.SUCCEEDED) {
+        const order = await this.getOrderByIdOrThrow(intent.orderId);
+        await this.markOrderPaid(order, intent, verifyResponse);
+        await this.recordOrderPaymentSettlement(order, intent);
+      }
       return intent;
     }
 
@@ -453,6 +537,7 @@ export class PaymentsService {
 
     const order = await this.getOrderByIdOrThrow(intent.orderId);
     await this.markOrderPaid(order, intent, verifyResponse);
+    await this.recordOrderPaymentSettlement(order, savedIntent);
 
     return savedIntent;
   }
@@ -1015,6 +1100,14 @@ export class PaymentsService {
           event.eventType,
           body,
         );
+      }
+
+      if (
+        event.eventType === 'transfer.success' ||
+        event.eventType === 'transfer.failed' ||
+        event.eventType === 'transfer.reversed'
+      ) {
+        await this.payoutsService.processPaystackWebhook(event.eventType, body);
       }
 
       await this.webhookRepo.save({

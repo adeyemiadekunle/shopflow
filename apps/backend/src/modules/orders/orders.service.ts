@@ -16,15 +16,26 @@ import {
   ProductStatus,
 } from '../catalog/entities/product.entity';
 import { ProductVariant } from '../catalog/entities/product-variant.entity';
+import { LedgerService } from '../ledger/ledger.service';
+import {
+  LedgerAccountType,
+  LedgerEventType,
+} from '../ledger/enums/ledger.enum';
+import { PlatformConfigService } from '../platform-config/platform-config.service';
 import { ORDERS_QUEUE, OrderJobName } from '../queue/queue.constants';
 import { SellersService } from '../sellers/sellers.service';
 import { UserRole } from '../users/enums/user-role.enum';
 import {
   CreateOrderDto,
+  OpenDisputeDto,
+  ResolveDisputeDto,
+  ResolveDisputeOutcome,
   RespondToQuoteDto,
   SendDeliveryQuoteDto,
+  UpdateOrderProgressDto,
 } from './dto/orders.dto';
 import { DeliveryQuote, QuoteStatus } from './entities/delivery-quote.entity';
+import { DisputeCase, DisputeStatus } from './entities/dispute-case.entity';
 import {
   FulfilmentEvent,
   FulfilmentEventType,
@@ -43,6 +54,8 @@ export class OrdersService {
     private readonly orderItemRepo: Repository<OrderItem>,
     @InjectRepository(DeliveryQuote)
     private readonly deliveryQuoteRepo: Repository<DeliveryQuote>,
+    @InjectRepository(DisputeCase)
+    private readonly disputeRepo: Repository<DisputeCase>,
     @InjectRepository(FulfilmentEvent)
     private readonly eventRepo: Repository<FulfilmentEvent>,
     @InjectRepository(Product)
@@ -53,6 +66,8 @@ export class OrdersService {
     private readonly ordersQueue: Queue,
     private readonly config: ConfigService,
     private readonly sellersService: SellersService,
+    private readonly platformConfigService: PlatformConfigService,
+    private readonly ledgerService: LedgerService,
   ) {}
 
   generateReference(): string {
@@ -165,6 +180,46 @@ export class OrdersService {
     });
   }
 
+  private async getOpenDispute(orderId: string): Promise<DisputeCase | null> {
+    return this.disputeRepo.findOne({
+      where: [
+        { orderId, status: DisputeStatus.OPEN },
+        { orderId, status: DisputeStatus.UNDER_REVIEW },
+      ],
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  private addDays(baseDate: Date, days: number): Date {
+    const nextDate = new Date(baseDate);
+    nextDate.setDate(nextDate.getDate() + days);
+    return nextDate;
+  }
+
+  private getSettlementAmount(order: Order): number {
+    return Number(order.totalAmount);
+  }
+
+  private async ensureSellerSettlementAccounts(order: Order): Promise<void> {
+    await Promise.all([
+      this.ledgerService.ensureAccount(
+        LedgerAccountType.SELLER_PENDING,
+        order.sellerProfileId,
+        order.currency,
+      ),
+      this.ledgerService.ensureAccount(
+        LedgerAccountType.SELLER_AVAILABLE,
+        order.sellerProfileId,
+        order.currency,
+      ),
+      this.ledgerService.ensureAccount(
+        LedgerAccountType.REFUND_RESERVE,
+        undefined,
+        order.currency,
+      ),
+    ]);
+  }
+
   private async enqueueOrderNotification(
     jobName: OrderJobName,
     data: { orderId: string; accepted?: boolean },
@@ -187,6 +242,189 @@ export class OrdersService {
         delay,
       },
     );
+  }
+
+  private async moveSellerPendingToAvailable(
+    order: Order,
+    actorId: string,
+    notes: string,
+  ): Promise<void> {
+    const amount = this.getSettlementAmount(order);
+    if (amount <= 0) {
+      return;
+    }
+
+    await this.ensureSellerSettlementAccounts(order);
+
+    const reference = `hold-release:${order.id}`;
+    const pendingAlreadyMoved = await this.ledgerService.hasRecordedReference({
+      reference,
+      eventType: LedgerEventType.HOLD_RELEASED,
+      accountType: LedgerAccountType.SELLER_PENDING,
+    });
+    const availableAlreadyMoved = await this.ledgerService.hasRecordedReference({
+      reference,
+      eventType: LedgerEventType.HOLD_RELEASED,
+      accountType: LedgerAccountType.SELLER_AVAILABLE,
+    });
+
+    if (!pendingAlreadyMoved) {
+      await this.ledgerService.record({
+        accountType: LedgerAccountType.SELLER_PENDING,
+        ownerId: order.sellerProfileId,
+        amount: -amount,
+        currency: order.currency,
+        orderId: order.id,
+        actorId,
+        eventType: LedgerEventType.HOLD_RELEASED,
+        reference,
+        notes,
+      });
+    }
+
+    if (!availableAlreadyMoved) {
+      await this.ledgerService.record({
+        accountType: LedgerAccountType.SELLER_AVAILABLE,
+        ownerId: order.sellerProfileId,
+        amount,
+        currency: order.currency,
+        orderId: order.id,
+        actorId,
+        eventType: LedgerEventType.HOLD_RELEASED,
+        reference,
+        notes,
+      });
+    }
+  }
+
+  private async moveSellerPendingToRefundReserve(
+    order: Order,
+    actorId: string,
+    notes: string,
+  ): Promise<void> {
+    const amount = this.getSettlementAmount(order);
+    if (amount <= 0) {
+      return;
+    }
+
+    await this.ensureSellerSettlementAccounts(order);
+
+    const reference = `refund-reserve:${order.id}`;
+    const pendingAlreadyMoved = await this.ledgerService.hasRecordedReference({
+      reference,
+      eventType: LedgerEventType.REFUND_INITIATED,
+      accountType: LedgerAccountType.SELLER_PENDING,
+    });
+    const reserveAlreadyMoved = await this.ledgerService.hasRecordedReference({
+      reference,
+      eventType: LedgerEventType.REFUND_INITIATED,
+      accountType: LedgerAccountType.REFUND_RESERVE,
+    });
+
+    if (!pendingAlreadyMoved) {
+      await this.ledgerService.record({
+        accountType: LedgerAccountType.SELLER_PENDING,
+        ownerId: order.sellerProfileId,
+        amount: -amount,
+        currency: order.currency,
+        orderId: order.id,
+        actorId,
+        eventType: LedgerEventType.REFUND_INITIATED,
+        reference,
+        notes,
+      });
+    }
+
+    if (!reserveAlreadyMoved) {
+      await this.ledgerService.record({
+        accountType: LedgerAccountType.REFUND_RESERVE,
+        amount,
+        currency: order.currency,
+        orderId: order.id,
+        actorId,
+        eventType: LedgerEventType.REFUND_INITIATED,
+        reference,
+        notes,
+      });
+    }
+  }
+
+  private async releaseHeldFundsInternal(
+    orderId: string,
+    actorId: string,
+    options?: {
+      allowBeforeHoldExpires?: boolean;
+      tolerateBlockedRelease?: boolean;
+      notes?: string;
+    },
+  ): Promise<Order> {
+    const order = await this.findById(orderId);
+
+    if (order.fundsReleasedAt || order.status === OrderStatus.COMPLETED) {
+      return order;
+    }
+
+    if (
+      order.status !== OrderStatus.DELIVERED_PENDING_CONFIRMATION &&
+      order.status !== OrderStatus.DISPUTE_OPEN
+    ) {
+      if (options?.tolerateBlockedRelease) {
+        return order;
+      }
+      throw new BadRequestException(
+        `Held funds can only be released after delivery or seller-favour dispute resolution. Current status: ${order.status}`,
+      );
+    }
+
+    if (
+      !options?.allowBeforeHoldExpires &&
+      order.fundsHeldUntil &&
+      order.fundsHeldUntil.getTime() > Date.now()
+    ) {
+      if (options?.tolerateBlockedRelease) {
+        return order;
+      }
+      throw new BadRequestException(
+        'Held funds cannot be released before the return-policy window expires',
+      );
+    }
+
+    const openDispute = await this.getOpenDispute(order.id);
+    if (openDispute) {
+      if (options?.tolerateBlockedRelease) {
+        return order;
+      }
+      throw new BadRequestException(
+        'Held funds cannot be released while an order dispute is still open',
+      );
+    }
+
+    const notes =
+      options?.notes ??
+      'Held seller funds released after return-policy hold elapsed.';
+
+    await this.moveSellerPendingToAvailable(order, actorId, notes);
+
+    await this.orderRepo.save({
+      ...order,
+      status: OrderStatus.COMPLETED,
+      completedAt: new Date(),
+      fundsReleasedAt: new Date(),
+    });
+
+    await this.logEvent(
+      order.id,
+      FulfilmentEventType.FUNDS_RELEASED,
+      actorId,
+      notes,
+      {
+        fundsHeldUntil: order.fundsHeldUntil?.toISOString(),
+        releasedAt: new Date().toISOString(),
+        settlementAmount: this.getSettlementAmount(order),
+      },
+    );
+
+    return this.findById(order.id);
   }
 
   async findById(id: string): Promise<Order> {
@@ -533,6 +771,300 @@ export class OrdersService {
     );
 
     return this.findById(orderId);
+  }
+
+  async markPreparing(
+    sellerUserId: string,
+    orderId: string,
+    dto: UpdateOrderProgressDto,
+  ): Promise<Order> {
+    const order = await this.getSellerOwnedOrderOrThrow(sellerUserId, orderId);
+
+    if (order.status !== OrderStatus.PAID) {
+      throw new BadRequestException(
+        'Only paid orders can be moved to seller preparing',
+      );
+    }
+
+    await this.orderRepo.save({
+      ...order,
+      status: OrderStatus.SELLER_PREPARING,
+    });
+
+    await this.logEvent(
+      orderId,
+      FulfilmentEventType.PREPARING,
+      sellerUserId,
+      dto.notes?.trim(),
+    );
+
+    return this.findById(orderId);
+  }
+
+  async markShipped(
+    sellerUserId: string,
+    orderId: string,
+    dto: UpdateOrderProgressDto,
+  ): Promise<Order> {
+    const order = await this.getSellerOwnedOrderOrThrow(sellerUserId, orderId);
+
+    if (order.status !== OrderStatus.SELLER_PREPARING) {
+      throw new BadRequestException(
+        'Only prepared orders can be marked as shipped',
+      );
+    }
+
+    await this.orderRepo.save({
+      ...order,
+      status: OrderStatus.SHIPPED,
+    });
+
+    await this.logEvent(
+      orderId,
+      FulfilmentEventType.SHIPPED,
+      sellerUserId,
+      dto.notes?.trim(),
+    );
+
+    return this.findById(orderId);
+  }
+
+  async markDelivered(
+    sellerUserId: string,
+    orderId: string,
+    dto: UpdateOrderProgressDto,
+  ): Promise<Order> {
+    const order = await this.getSellerOwnedOrderOrThrow(sellerUserId, orderId);
+
+    if (order.status !== OrderStatus.SHIPPED) {
+      throw new BadRequestException(
+        'Only shipped orders can be marked as delivered',
+      );
+    }
+
+    const deliveredAt = new Date();
+    const returnPolicyDays =
+      await this.platformConfigService.getReturnPolicyDays();
+    const fundsHeldUntil = this.addDays(deliveredAt, returnPolicyDays);
+
+    await this.orderRepo.save({
+      ...order,
+      status: OrderStatus.DELIVERED_PENDING_CONFIRMATION,
+      deliveredAt,
+      fundsHeldUntil,
+    });
+
+    await this.logEvent(
+      orderId,
+      FulfilmentEventType.DELIVERED,
+      sellerUserId,
+      dto.notes?.trim(),
+      {
+        returnPolicyDays,
+        fundsHeldUntil: fundsHeldUntil.toISOString(),
+      },
+    );
+
+    const delay = Math.max(fundsHeldUntil.getTime() - deliveredAt.getTime(), 0);
+    await this.enqueueDelayedOrderJob(
+      OrderJobName.RELEASE_HELD_ORDER_FUNDS,
+      orderId,
+      delay,
+    );
+
+    return this.findById(orderId);
+  }
+
+  async confirmDelivery(
+    buyerId: string,
+    orderId: string,
+    dto: UpdateOrderProgressDto,
+  ): Promise<Order> {
+    const order = await this.findById(orderId);
+
+    if (order.buyerId !== buyerId) {
+      throw new ForbiddenException('You can only confirm your own orders');
+    }
+
+    if (order.status !== OrderStatus.DELIVERED_PENDING_CONFIRMATION) {
+      throw new BadRequestException(
+        'Only delivered orders can be confirmed by the buyer',
+      );
+    }
+
+    if (order.buyerConfirmedAt) {
+      return order;
+    }
+
+    await this.orderRepo.save({
+      ...order,
+      buyerConfirmedAt: new Date(),
+    });
+
+    await this.logEvent(
+      orderId,
+      FulfilmentEventType.BUYER_CONFIRMED,
+      buyerId,
+      dto.notes?.trim(),
+    );
+
+    return this.findById(orderId);
+  }
+
+  async openDispute(
+    buyerId: string,
+    orderId: string,
+    dto: OpenDisputeDto,
+  ): Promise<Order> {
+    const order = await this.findById(orderId);
+
+    if (order.buyerId !== buyerId) {
+      throw new ForbiddenException('You can only dispute your own orders');
+    }
+
+    if (order.status !== OrderStatus.DELIVERED_PENDING_CONFIRMATION) {
+      throw new BadRequestException(
+        'Disputes can only be opened after delivery and before funds are released',
+      );
+    }
+
+    if (order.fundsReleasedAt) {
+      throw new BadRequestException(
+        'This order has already released seller funds and can no longer be disputed',
+      );
+    }
+
+    const existingOpenDispute = await this.getOpenDispute(order.id);
+    if (existingOpenDispute) {
+      throw new BadRequestException(
+        'An open dispute already exists for this order',
+      );
+    }
+
+    const dispute = await this.disputeRepo.save(
+      this.disputeRepo.create({
+        orderId: order.id,
+        raisedById: buyerId,
+        reason: dto.reason.trim(),
+        evidenceUrls: dto.evidenceUrls,
+        status: DisputeStatus.OPEN,
+      }),
+    );
+
+    await this.orderRepo.save({
+      ...order,
+      status: OrderStatus.DISPUTE_OPEN,
+    });
+
+    await this.logEvent(
+      orderId,
+      FulfilmentEventType.DISPUTE_OPENED,
+      buyerId,
+      dto.reason.trim(),
+      {
+        disputeId: dispute.id,
+        evidenceCount: dto.evidenceUrls?.length ?? 0,
+      },
+    );
+
+    return this.findById(orderId);
+  }
+
+  async resolveDispute(
+    disputeId: string,
+    adminId: string,
+    dto: ResolveDisputeDto,
+  ): Promise<Order> {
+    const dispute = await this.disputeRepo.findOne({
+      where: { id: disputeId },
+    });
+
+    if (!dispute) {
+      throw new NotFoundException(`Dispute ${disputeId} not found`);
+    }
+
+    if (
+      dispute.status !== DisputeStatus.OPEN &&
+      dispute.status !== DisputeStatus.UNDER_REVIEW
+    ) {
+      throw new BadRequestException('This dispute has already been resolved');
+    }
+
+    const order = await this.findById(dispute.orderId);
+    if (order.status !== OrderStatus.DISPUTE_OPEN) {
+      throw new BadRequestException(
+        'Only orders with an open dispute can be resolved',
+      );
+    }
+    const resolutionNotes =
+      dto.resolutionNotes?.trim() ??
+      (dto.outcome === ResolveDisputeOutcome.SELLER
+        ? 'Admin resolved the dispute in favour of the seller.'
+        : 'Admin resolved the dispute in favour of the buyer and moved funds into refund reserve.');
+
+    if (dto.outcome === ResolveDisputeOutcome.SELLER) {
+      await this.disputeRepo.save({
+        ...dispute,
+        status: DisputeStatus.RESOLVED_SELLER,
+        resolutionNotes,
+        resolvedAt: new Date(),
+      });
+
+      await this.logEvent(
+        order.id,
+        FulfilmentEventType.DISPUTE_RESOLVED,
+        adminId,
+        resolutionNotes,
+        {
+          disputeId: dispute.id,
+          outcome: ResolveDisputeOutcome.SELLER,
+        },
+      );
+
+      return this.releaseHeldFundsInternal(order.id, adminId, {
+        allowBeforeHoldExpires: true,
+        notes: resolutionNotes,
+      });
+    }
+
+    if (order.fundsReleasedAt) {
+      throw new BadRequestException(
+        'Cannot resolve a dispute in favour of the buyer after seller funds were released',
+      );
+    }
+
+    await this.moveSellerPendingToRefundReserve(order, adminId, resolutionNotes);
+
+    await this.disputeRepo.save({
+      ...dispute,
+      status: DisputeStatus.RESOLVED_BUYER,
+      resolutionNotes,
+      resolvedAt: new Date(),
+    });
+
+    await this.orderRepo.save({
+      ...order,
+      status: OrderStatus.REFUNDED,
+    });
+
+    await this.logEvent(
+      order.id,
+      FulfilmentEventType.DISPUTE_RESOLVED,
+      adminId,
+      resolutionNotes,
+      {
+        disputeId: dispute.id,
+        outcome: ResolveDisputeOutcome.BUYER,
+      },
+    );
+
+    return this.findById(order.id);
+  }
+
+  async releaseHeldFundsFromQueue(orderId: string): Promise<Order> {
+    return this.releaseHeldFundsInternal(orderId, 'system', {
+      tolerateBlockedRelease: true,
+    });
   }
 
   async transition(
