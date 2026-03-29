@@ -425,6 +425,9 @@ export class CartService {
         quantity: item.quantity,
       })),
       deliveryAddress: dto.deliveryAddress,
+      deliveryAddressId: dto.deliveryAddressId,
+      billingAddressId: dto.billingAddressId,
+      useDeliveryAddressForBilling: dto.useDeliveryAddressForBilling,
       buyerNote: dto.buyerNote?.trim(),
     });
 

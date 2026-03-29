@@ -10,6 +10,7 @@ import { OrdersController } from './orders.controller';
 import { Product } from '../catalog/entities/product.entity';
 import { ProductVariant } from '../catalog/entities/product-variant.entity';
 import { MailModule } from '../mail/mail.module';
+import { AddressesModule } from '../addresses/addresses.module';
 import { SellersModule } from '../sellers/sellers.module';
 import { PlatformConfigModule } from '../platform-config/platform-config.module';
 import { LedgerModule } from '../ledger/ledger.module';
@@ -39,6 +40,7 @@ type QueueConnectionOptions = NonNullable<QueueOptions['connection']>;
       Product,
       ProductVariant,
     ]),
+    AddressesModule,
     SellersModule,
     PlatformConfigModule,
     LedgerModule,

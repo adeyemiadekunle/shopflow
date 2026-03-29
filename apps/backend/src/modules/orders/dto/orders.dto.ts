@@ -96,6 +96,22 @@ export class CreateOrderDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  @IsUUID()
+  deliveryAddressId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  billingAddressId?: string;
+
+  @ApiPropertyOptional({ default: true })
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  useDeliveryAddressForBilling?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsString()
   buyerNote?: string;
 }

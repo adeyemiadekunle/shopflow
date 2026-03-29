@@ -10,6 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
 import { In, Repository } from 'typeorm';
+import { AddressesService } from '../addresses/addresses.service';
 import { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import {
   DiscountType,
@@ -66,6 +67,7 @@ export class OrdersService {
     private readonly productVariantRepo: Repository<ProductVariant>,
     @Inject(ORDERS_QUEUE)
     private readonly ordersQueue: Queue,
+    private readonly addressesService: AddressesService,
     private readonly config: ConfigService,
     private readonly sellersService: SellersService,
     private readonly platformConfigService: PlatformConfigService,
@@ -422,6 +424,27 @@ export class OrdersService {
   }
 
   async createOrder(buyerId: string, dto: CreateOrderDto): Promise<Order> {
+    if (dto.deliveryAddress && dto.deliveryAddressId) {
+      throw new BadRequestException(
+        'Provide either deliveryAddress or deliveryAddressId, not both',
+      );
+    }
+
+    if (dto.billingAddressId && (dto.useDeliveryAddressForBilling ?? true)) {
+      throw new BadRequestException(
+        'billingAddressId cannot be used when useDeliveryAddressForBilling is true',
+      );
+    }
+
+    const resolvedAddresses =
+      dto.deliveryAddressId || dto.billingAddressId
+        ? await this.addressesService.resolveAddressesForCheckout(buyerId, {
+            deliveryAddressId: dto.deliveryAddressId,
+            billingAddressId: dto.billingAddressId,
+            useDeliveryAddressForBilling: dto.useDeliveryAddressForBilling,
+          })
+        : { deliveryAddress: undefined, billingAddress: undefined };
+
     const productIds = Array.from(
       new Set(dto.items.map((item) => item.productId)),
     );
@@ -542,7 +565,18 @@ export class OrdersService {
       currency,
       deliveryAddress: dto.deliveryAddress
         ? ({ ...dto.deliveryAddress } as Record<string, unknown>)
-        : undefined,
+        : resolvedAddresses.deliveryAddress
+          ? ({
+              ...resolvedAddresses.deliveryAddress,
+            } as Record<string, unknown>)
+          : undefined,
+      billingAddress: resolvedAddresses.billingAddress
+        ? ({
+            ...resolvedAddresses.billingAddress,
+          } as Record<string, unknown>)
+        : dto.deliveryAddress && (dto.useDeliveryAddressForBilling ?? true)
+          ? ({ ...dto.deliveryAddress } as Record<string, unknown>)
+          : undefined,
       buyerNote: dto.buyerNote?.trim(),
       items,
     });

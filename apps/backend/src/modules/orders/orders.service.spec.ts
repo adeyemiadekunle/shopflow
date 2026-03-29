@@ -6,6 +6,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { AddressesService } from '../addresses/addresses.service';
 import { Product } from '../catalog/entities/product.entity';
 import { ProductVariant } from '../catalog/entities/product-variant.entity';
 import { LedgerService } from '../ledger/ledger.service';
@@ -116,6 +117,10 @@ describe('OrdersService', () => {
     getReturnPolicyDays: jest.fn().mockResolvedValue(7),
   };
 
+  const mockAddressesService = {
+    resolveAddressesForCheckout: jest.fn(),
+  };
+
   const mockLedgerService = {
     ensureAccount: jest.fn().mockResolvedValue(undefined),
     hasRecordedReference: jest.fn().mockResolvedValue(false),
@@ -153,6 +158,10 @@ describe('OrdersService', () => {
     mockOrdersQueue.add.mockResolvedValue({});
     mockDisputeRepo.findOne.mockResolvedValue(null);
     mockLedgerService.hasRecordedReference.mockResolvedValue(false);
+    mockAddressesService.resolveAddressesForCheckout.mockResolvedValue({
+      deliveryAddress: undefined,
+      billingAddress: undefined,
+    });
     mockRefundsService.createRefundForResolvedDispute.mockResolvedValue({
       id: 'refund-1',
       orderId: 'order-1',
@@ -185,6 +194,7 @@ describe('OrdersService', () => {
           provide: PlatformConfigService,
           useValue: mockPlatformConfigService,
         },
+        { provide: AddressesService, useValue: mockAddressesService },
         { provide: LedgerService, useValue: mockLedgerService },
         { provide: RefundsService, useValue: mockRefundsService },
       ],
@@ -350,6 +360,96 @@ describe('OrdersService', () => {
         delay: 86400000,
         jobId: 'expire-awaiting-delivery-quote:order-new',
       },
+    );
+  });
+
+  it('createOrder() should resolve saved delivery and billing addresses by id', async () => {
+    mockAddressesService.resolveAddressesForCheckout.mockResolvedValueOnce({
+      deliveryAddress: {
+        addressLine1: '12 Allen Avenue',
+        state: 'Lagos',
+        lga: 'Ikeja',
+        country: 'NG',
+      },
+      billingAddress: {
+        addressLine1: '15 Opebi Road',
+        state: 'Lagos',
+        lga: 'Ikeja',
+        country: 'NG',
+      },
+    });
+    mockProductRepo.find.mockResolvedValue([
+      {
+        id: 'product-1',
+        title: 'Ankara Gown',
+        description: 'Premium dress',
+        sellerProfileId: 'seller-1',
+        currency: 'NGN',
+        basePrice: 10000,
+        effectivePrice: 9000,
+        hasDiscount: true,
+        discountType: 'percentage',
+        discountValue: 10,
+        status: 'active',
+      },
+    ]);
+    mockProductVariantRepo.find.mockResolvedValue([]);
+    mockOrderRepo.save
+      .mockResolvedValueOnce({
+        id: 'order-addresses',
+        buyerId: 'buyer-1',
+        sellerProfileId: 'seller-1',
+        status: OrderStatus.AWAITING_DELIVERY_QUOTE,
+        itemsTotal: 9000,
+        platformFee: 0,
+        totalAmount: 9000,
+        currency: 'NGN',
+      })
+      .mockResolvedValueOnce({
+        ...mockOrder,
+        id: 'order-addresses',
+        buyerId: 'buyer-1',
+        sellerProfileId: 'seller-1',
+        status: OrderStatus.AWAITING_DELIVERY_QUOTE,
+      });
+    mockOrderRepo.findOne.mockResolvedValueOnce({
+      ...mockOrder,
+      id: 'order-addresses',
+      buyerId: 'buyer-1',
+      sellerProfileId: 'seller-1',
+      status: OrderStatus.AWAITING_DELIVERY_QUOTE,
+    });
+
+    await service.createOrder('buyer-1', {
+      items: [{ productId: 'product-1', quantity: 1 }],
+      deliveryAddressId: 'address-1',
+      billingAddressId: 'address-2',
+      useDeliveryAddressForBilling: false,
+    });
+
+    expect(mockAddressesService.resolveAddressesForCheckout).toHaveBeenCalledWith(
+      'buyer-1',
+      {
+        deliveryAddressId: 'address-1',
+        billingAddressId: 'address-2',
+        useDeliveryAddressForBilling: false,
+      },
+    );
+    expect(mockOrderRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        deliveryAddress: {
+          addressLine1: '12 Allen Avenue',
+          state: 'Lagos',
+          lga: 'Ikeja',
+          country: 'NG',
+        },
+        billingAddress: {
+          addressLine1: '15 Opebi Road',
+          state: 'Lagos',
+          lga: 'Ikeja',
+          country: 'NG',
+        },
+      }),
     );
   });
 

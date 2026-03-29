@@ -74,6 +74,7 @@ Copy `.env.example` to `.env` and fill in:
 | payouts | `/payouts` | Admin-managed seller payout requests, approvals, sends, and payout summaries |
 | refunds | `/refunds` | Admin-managed refunds, Paystack refund retries, and refund state tracking |
 | cart | `/cart` | Buyer cart grouped by seller with seller-scoped checkout |
+| addresses | `/addresses` | Buyer saved delivery/billing address book with defaults |
 | ledger | `/ledger` | Immutable double-entry ledger (12 event types, 7 account types); atomic `record()` with pessimistic lock; currency from platform config |
 | subscriptions | `/subscriptions` | Seller tiers, checkout, recurring verification, cancellation, and admin plan sync |
 | platform-config | `/platform-config` | Market identity from env vars (currency, country); business rules (commission, return policy) managed via admin API |
@@ -122,17 +123,19 @@ npm run test:cov      # Coverage report
 
 Recommended buyer checkout flow:
 
-1. Add items with `POST /api/v1/cart/items`.
-2. Show the buyer cart grouped by seller from `GET /api/v1/cart`.
-3. Create one seller-scoped order with `POST /api/v1/cart/sellers/:sellerProfileId/checkout`.
-4. Wait for the seller to send a quote with `POST /api/v1/orders/:id/quote`.
-5. Accept the quote with `POST /api/v1/orders/:id/quote-response`.
-6. Initialize Paystack Checkout with `POST /api/v1/payments/checkout/:orderId`.
-7. Redirect the browser to the returned `authorizationUrl`.
-8. After redirect back from Paystack, call `POST /api/v1/payments/verify`.
-9. Sellers progress fulfilment with `POST /api/v1/orders/:id/prepare`, `/ship`, and `/deliver`.
-10. Buyers can confirm delivery with `POST /api/v1/orders/:id/confirm-delivery` or raise a dispute with `POST /api/v1/orders/:id/disputes`.
-11. Refresh the order from `GET /api/v1/orders/:id`.
+1. Save reusable buyer addresses with `POST /api/v1/addresses` when needed.
+2. Add items with `POST /api/v1/cart/items`.
+3. Show the buyer cart grouped by seller from `GET /api/v1/cart`.
+4. Create one seller-scoped order with `POST /api/v1/cart/sellers/:sellerProfileId/checkout`.
+   You can pass saved `deliveryAddressId`, `billingAddressId`, or use the same delivery address for billing.
+5. Wait for the seller to send a quote with `POST /api/v1/orders/:id/quote`.
+6. Accept the quote with `POST /api/v1/orders/:id/quote-response`.
+7. Initialize Paystack Checkout with `POST /api/v1/payments/checkout/:orderId`.
+8. Redirect the browser to the returned `authorizationUrl`.
+9. After redirect back from Paystack, call `POST /api/v1/payments/verify`.
+10. Sellers progress fulfilment with `POST /api/v1/orders/:id/prepare`, `/ship`, and `/deliver`.
+11. Buyers can confirm delivery with `POST /api/v1/orders/:id/confirm-delivery` or raise a dispute with `POST /api/v1/orders/:id/disputes`.
+12. Refresh the order from `GET /api/v1/orders/:id`.
 
 Checkout init body:
 

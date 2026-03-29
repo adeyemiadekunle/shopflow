@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsInt,
   IsOptional,
   IsString,
@@ -42,6 +43,22 @@ export class CheckoutCartSellerDto {
   @ValidateNested()
   @Type(() => DeliveryAddressDto)
   deliveryAddress?: DeliveryAddressDto;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  deliveryAddressId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  billingAddressId?: string;
+
+  @ApiPropertyOptional({ default: true })
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  useDeliveryAddressForBilling?: boolean;
 
   @ApiPropertyOptional()
   @IsOptional()

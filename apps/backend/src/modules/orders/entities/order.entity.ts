@@ -82,6 +82,9 @@ export class Order {
   @Column({ name: 'delivery_address', type: 'jsonb', nullable: true })
   deliveryAddress?: Record<string, unknown>;
 
+  @Column({ name: 'billing_address', type: 'jsonb', nullable: true })
+  billingAddress?: Record<string, unknown>;
+
   @Column({ name: 'buyer_note', type: 'text', nullable: true })
   buyerNote?: string;
 

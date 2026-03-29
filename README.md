@@ -13,6 +13,7 @@
 - [Running the App](#running-the-app)
 - [API Modules](#api-modules)
 - [Platform Config](#platform-config)
+- [Addresses](#addresses--apiv1addresses)
 - [Cart](#cart--apiv1cart)
 - [Subscription Tiers](#subscription-tiers)
 - [Testing](#testing)
@@ -295,22 +296,42 @@ Cart rule:
 - Buyers can collect items from many sellers in the UI.
 - Checkout still happens one seller group at a time because delivery quotes, disputes, payouts, and settlement are seller-scoped.
 
+### Addresses — `/api/v1/addresses`
+
+Buyer saved address book for delivery, billing, or both.
+
+| Method | Route | Auth | Description |
+|---|---|---|---|
+| GET | `/addresses` | Buyer | List saved buyer addresses |
+| GET | `/addresses/defaults` | Buyer | Get default delivery and billing addresses |
+| POST | `/addresses` | Buyer | Create a saved buyer address |
+| PATCH | `/addresses/:id` | Buyer | Update a saved buyer address |
+| POST | `/addresses/:id/defaults` | Buyer | Mark a saved buyer address as default delivery and/or billing |
+| DELETE | `/addresses/:id` | Buyer | Delete a saved buyer address |
+
+Address rule:
+
+- One saved address can serve as delivery, billing, or both.
+- Checkout can reuse saved address IDs instead of sending the same address payload repeatedly.
+
 ### Frontend Checkout Flow
 
 Recommended frontend implementation:
 
 1. Buyer adds items with `POST /api/v1/cart/items`.
-2. Frontend reads seller-grouped cart data with `GET /api/v1/cart`.
-3. Buyer creates one seller-scoped order with `POST /api/v1/cart/sellers/:sellerProfileId/checkout`.
-4. Seller sends the delivery quote with `POST /api/v1/orders/:id/quote`.
-5. Buyer accepts the quote with `POST /api/v1/orders/:id/quote-response`.
-6. Frontend calls `POST /api/v1/payments/checkout/:orderId` with the buyer access token.
-7. Backend returns `authorizationUrl`, `reference`, and `accessCode`.
-8. Frontend redirects the buyer to `authorizationUrl`.
-9. After Paystack returns to the frontend, call `POST /api/v1/payments/verify` with the `reference`.
-10. Seller progresses the order with `/prepare`, `/ship`, and `/deliver`.
-11. Frontend refreshes the order with `GET /api/v1/orders/:id`.
-12. Seller funds remain on hold until the return-policy window passes or any dispute is resolved.
+2. Frontend optionally saves reusable delivery/billing addresses with `POST /api/v1/addresses`.
+3. Frontend reads seller-grouped cart data with `GET /api/v1/cart`.
+4. Buyer creates one seller-scoped order with `POST /api/v1/cart/sellers/:sellerProfileId/checkout`.
+   You can pass `deliveryAddressId`, `billingAddressId`, or `useDeliveryAddressForBilling`.
+5. Seller sends the delivery quote with `POST /api/v1/orders/:id/quote`.
+6. Buyer accepts the quote with `POST /api/v1/orders/:id/quote-response`.
+7. Frontend calls `POST /api/v1/payments/checkout/:orderId` with the buyer access token.
+8. Backend returns `authorizationUrl`, `reference`, and `accessCode`.
+9. Frontend redirects the buyer to `authorizationUrl`.
+10. After Paystack returns to the frontend, call `POST /api/v1/payments/verify` with the `reference`.
+11. Seller progresses the order with `/prepare`, `/ship`, and `/deliver`.
+12. Frontend refreshes the order with `GET /api/v1/orders/:id`.
+13. Seller funds remain on hold until the return-policy window passes or any dispute is resolved.
 
 Example checkout init request:
 
