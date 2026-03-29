@@ -21,7 +21,6 @@ import { PaystackService } from './paystack.service';
 import { PaymentsController } from './payments.controller';
 import { PaymentsProcessor } from './payments.processor';
 import { PaymentsService } from './payments.service';
-import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { PayoutsModule } from '../payouts/payouts.module';
 import { RefundsModule } from '../refunds/refunds.module';
 
@@ -40,7 +39,6 @@ type QueueConnectionOptions = NonNullable<QueueOptions['connection']>;
     ]),
     UsersModule,
     LedgerModule,
-    forwardRef(() => SubscriptionsModule),
     forwardRef(() => PayoutsModule),
     forwardRef(() => RefundsModule),
   ],

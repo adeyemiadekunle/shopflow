@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { PlatformConfigKey } from '../platform-config/constants/platform-config.keys';
+import { PlatformConfigService } from '../platform-config/platform-config.service';
 import { Conversation } from './entities/conversation.entity';
 import { ChatMessage } from './entities/chat-message.entity';
 import { MessageSenderRole } from './enums/message-sender-role.enum';
@@ -13,7 +15,19 @@ export class ChatService {
     private readonly convoRepo: Repository<Conversation>,
     @InjectRepository(ChatMessage)
     private readonly msgRepo: Repository<ChatMessage>,
+    private readonly platformConfigService: PlatformConfigService,
   ) {}
+
+  private async assertChatEnabled(): Promise<void> {
+    const chatEnabled = await this.platformConfigService.getBoolean(
+      PlatformConfigKey.FEATURE_CHAT_ENABLED,
+      true,
+    );
+
+    if (!chatEnabled) {
+      throw new NotFoundException('Chat is not enabled right now');
+    }
+  }
 
   /**
    * Find or create a conversation between buyer and seller.
@@ -23,6 +37,8 @@ export class ChatService {
     buyerId: string,
     sellerProfileId: string,
   ): Promise<Conversation> {
+    await this.assertChatEnabled();
+
     let convo = await this.convoRepo.findOne({
       where: { buyerId, sellerProfileId },
       relations: ['sellerProfile', 'buyer'],
@@ -86,6 +102,7 @@ export class ChatService {
       where: { id: conversationId },
     });
     if (!convo) throw new NotFoundException('Conversation not found');
+    await this.assertChatEnabled();
 
     const msg = await this.msgRepo.save(
       this.msgRepo.create({

@@ -21,7 +21,6 @@ import { CatalogModule } from './modules/catalog/catalog.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { LedgerModule } from './modules/ledger/ledger.module';
-import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { PlatformConfigModule } from './modules/platform-config/platform-config.module';
 import { FeedModule } from './modules/feed/feed.module';
 import { ChatModule } from './modules/chat/chat.module';
@@ -52,8 +51,6 @@ import { PaymentReconciliationRun } from './modules/payments/entities/payment-re
 import { WebhookEvent } from './modules/payments/entities/webhook-event.entity';
 import { LedgerAccount } from './modules/ledger/entities/ledger-account.entity';
 import { LedgerEntry } from './modules/ledger/entities/ledger-entry.entity';
-import { SubscriptionTier } from './modules/subscriptions/entities/subscription-tier.entity';
-import { SellerSubscription } from './modules/subscriptions/entities/seller-subscription.entity';
 import { PlatformConfig } from './modules/platform-config/entities/platform-config.entity';
 import { FeedPost } from './modules/feed/entities/feed-post.entity';
 import { FeedLike } from './modules/feed/entities/feed-like.entity';
@@ -133,8 +130,6 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
           WebhookEvent,
           LedgerAccount,
           LedgerEntry,
-          SubscriptionTier,
-          SellerSubscription,
           Payout,
           PlatformConfig,
           FeedPost,
@@ -171,7 +166,6 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
     OrdersModule,
     PaymentsModule,
     LedgerModule,
-    SubscriptionsModule,
     PlatformConfigModule,
     FeedModule,
     ChatModule,

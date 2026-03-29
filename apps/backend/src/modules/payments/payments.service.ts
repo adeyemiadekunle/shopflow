@@ -27,7 +27,6 @@ import { OrderStatus } from '../orders/enums/order-status.enum';
 import { UsersService } from '../users/users.service';
 import { UserRole } from '../users/enums/user-role.enum';
 import { PAYMENTS_QUEUE, PaymentJobName } from '../queue/queue.constants';
-import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { PayoutsService } from '../payouts/payouts.service';
 import { RefundsService } from '../refunds/refunds.service';
 import {
@@ -100,8 +99,6 @@ export class PaymentsService {
     private readonly paystackService: PaystackService,
     private readonly usersService: UsersService,
     private readonly ledgerService: LedgerService,
-    @Inject(forwardRef(() => SubscriptionsService))
-    private readonly subscriptionsService: SubscriptionsService,
     @Inject(forwardRef(() => PayoutsService))
     private readonly payoutsService: PayoutsService,
     @Inject(forwardRef(() => RefundsService))
@@ -1051,28 +1048,12 @@ export class PaymentsService {
 
     try {
       if (event.eventType === 'charge.success' && event.reference) {
-        try {
-          const intent = await this.getIntentByReferenceOrThrow(event.reference);
-          if (intent.status !== PaymentIntentStatus.SUCCEEDED) {
-            const verifyResponse = await this.paystackService.verifyTransaction(
-              event.reference,
-            );
-            await this.finalizeVerifiedPayment(intent, verifyResponse);
-          }
-        } catch (error) {
-          if (!(error instanceof NotFoundException)) {
-            throw error;
-          }
-
-          const handledBySubscriptions =
-            await this.subscriptionsService.processPaystackWebhook(
-              event.eventType,
-              body,
-            );
-
-          if (!handledBySubscriptions) {
-            throw error;
-          }
+        const intent = await this.getIntentByReferenceOrThrow(event.reference);
+        if (intent.status !== PaymentIntentStatus.SUCCEEDED) {
+          const verifyResponse = await this.paystackService.verifyTransaction(
+            event.reference,
+          );
+          await this.finalizeVerifiedPayment(intent, verifyResponse);
         }
       }
 
@@ -1091,18 +1072,6 @@ export class PaymentsService {
             `Ignoring charge.failed webhook for already successful payment ${event.reference}`,
           );
         }
-      }
-
-      if (
-        event.eventType === 'subscription.create' ||
-        event.eventType === 'subscription.disable' ||
-        event.eventType === 'invoice.update' ||
-        event.eventType === 'invoice.payment_failed'
-      ) {
-        await this.subscriptionsService.processPaystackWebhook(
-          event.eventType,
-          body,
-        );
       }
 
       if (

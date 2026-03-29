@@ -9,15 +9,6 @@ export interface PaystackInitResponse {
   reference: string;
 }
 
-export interface PaystackPlanResponse {
-  id: number;
-  plan_code: string;
-  name: string;
-  amount: number;
-  interval: string;
-  currency: string;
-}
-
 export interface PaystackVerifyResponse {
   status: string; // 'success' | 'failed' | 'abandoned'
   reference: string;
@@ -29,15 +20,6 @@ export interface PaystackVerifyResponse {
   customer?: {
     customer_code?: string;
     email?: string;
-  };
-  plan?: {
-    plan_code?: string;
-    name?: string;
-  };
-  subscription?: {
-    subscription_code?: string;
-    email_token?: string;
-    next_payment_date?: string;
   };
   authorization: {
     authorization_code: string;
@@ -117,7 +99,6 @@ export class PaystackService {
     orderId?: string;
     buyerId?: string;
     sellerProfileId?: string;
-    planCode?: string;
     metadata?: Record<string, unknown>;
   }): Promise<PaystackInitResponse> {
     const { data } = await this.http.post('/transaction/initialize', {
@@ -127,7 +108,6 @@ export class PaystackService {
       reference: params.reference,
       callback_url: params.callbackUrl,
       channels: params.channels,
-      plan: params.planCode,
       metadata: {
         ...(params.orderId ? { order_id: params.orderId } : {}),
         ...(params.buyerId ? { buyer_id: params.buyerId } : {}),
@@ -138,23 +118,6 @@ export class PaystackService {
       },
     });
     return data.data as PaystackInitResponse;
-  }
-
-  async createPlan(params: {
-    name: string;
-    amountKobo: number;
-    interval: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'biannually' | 'annually';
-    currency: string;
-    description?: string;
-  }): Promise<PaystackPlanResponse> {
-    const { data } = await this.http.post('/plan', {
-      name: params.name,
-      amount: params.amountKobo,
-      interval: params.interval,
-      currency: params.currency,
-      description: params.description,
-    });
-    return data.data as PaystackPlanResponse;
   }
 
   async verifyTransaction(reference: string): Promise<PaystackVerifyResponse> {
@@ -241,17 +204,6 @@ export class PaystackService {
       reason: params.reason,
     });
     return data.data as PaystackTransferResponse;
-  }
-
-  async disableSubscription(params: {
-    code: string;
-    token: string;
-  }): Promise<unknown> {
-    const { data } = await this.http.post('/subscription/disable', {
-      code: params.code,
-      token: params.token,
-    });
-    return data.data;
   }
 
   verifyWebhookSignature(rawBody: Buffer, signature: string): boolean {

@@ -7,6 +7,8 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { MediaService } from '../media/media.service';
+import { PlatformConfigKey } from '../platform-config/constants/platform-config.keys';
+import { PlatformConfigService } from '../platform-config/platform-config.service';
 import { SellersService } from '../sellers/sellers.service';
 import { CreateProductDto, UpdateProductDto } from './dto/manage-product.dto';
 import { Category } from './entities/category.entity';
@@ -31,6 +33,7 @@ export class CatalogService {
     private readonly productMediaRepo: Repository<ProductMedia>,
     private readonly sellersService: SellersService,
     private readonly mediaService: MediaService,
+    private readonly platformConfigService: PlatformConfigService,
   ) {}
 
   findProducts(page = 1, limit = 20): Promise<[Product[], number]> {
@@ -243,6 +246,39 @@ export class CatalogService {
     }
   }
 
+  private async assertSellerProductLimits(params: {
+    nextMedia?: Array<{ type?: MediaType }>;
+  }): Promise<void> {
+    const catalogImagesEnabled = await this.platformConfigService.getBoolean(
+      PlatformConfigKey.FEATURE_MEDIA_CATALOG_IMAGES_ENABLED,
+      true,
+    );
+    const catalogVideoEnabled = await this.platformConfigService.getBoolean(
+      PlatformConfigKey.FEATURE_MEDIA_CATALOG_VIDEO_ENABLED,
+      false,
+    );
+
+    const hasImage =
+      params.nextMedia?.some(
+        (item) => (item.type ?? MediaType.IMAGE) === MediaType.IMAGE,
+      ) ?? false;
+
+    const hasVideo =
+      params.nextMedia?.some(
+        (item) => (item.type ?? MediaType.IMAGE) === MediaType.VIDEO,
+      ) ?? false;
+
+    if (hasImage && !catalogImagesEnabled) {
+      throw new ForbiddenException('Catalog image uploads are not enabled right now');
+    }
+
+    if (hasVideo && !catalogVideoEnabled) {
+      throw new ForbiddenException(
+        'Catalog video uploads are not enabled right now',
+      );
+    }
+  }
+
   private async getOwnedProductOrThrow(
     userId: string,
     productId: string,
@@ -274,6 +310,9 @@ export class CatalogService {
     await this.ensureCategoryExists(dto.categoryId);
     this.validateDiscount(dto);
     this.validateProductMedia(dto.media, dto.status ?? ProductStatus.DRAFT);
+    await this.assertSellerProductLimits({
+      nextMedia: dto.media,
+    });
 
     const product = this.productRepo.create({
       sellerProfileId: seller.id,
@@ -350,6 +389,9 @@ export class CatalogService {
       dto.media === undefined ? product.media : dto.media,
       dto.status ?? product.status,
     );
+    await this.assertSellerProductLimits({
+      nextMedia: dto.media === undefined ? product.media : dto.media,
+    });
 
     if (dto.variants !== undefined) {
       await this.productVariantRepo.delete({ productId });

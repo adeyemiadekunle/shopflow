@@ -13,7 +13,6 @@ import { OrderStatus } from '../orders/enums/order-status.enum';
 import { PAYMENTS_QUEUE } from '../queue/queue.constants';
 import { PayoutsService } from '../payouts/payouts.service';
 import { RefundsService } from '../refunds/refunds.service';
-import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { UsersService } from '../users/users.service';
 import {
   PaymentIntent,
@@ -123,10 +122,6 @@ describe('PaymentsService', () => {
     record: jest.fn().mockResolvedValue(undefined),
   };
 
-  const mockSubscriptionsService = {
-    processPaystackWebhook: jest.fn(),
-  };
-
   const mockPayoutsService = {
     processPaystackWebhook: jest.fn(),
   };
@@ -186,10 +181,6 @@ describe('PaymentsService', () => {
         { provide: PaystackService, useValue: mockPaystackService },
         { provide: UsersService, useValue: mockUsersService },
         { provide: LedgerService, useValue: mockLedgerService },
-        {
-          provide: SubscriptionsService,
-          useValue: mockSubscriptionsService,
-        },
         {
           provide: PayoutsService,
           useValue: mockPayoutsService,

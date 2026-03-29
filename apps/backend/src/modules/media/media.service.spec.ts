@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
+import { PlatformConfigService } from '../platform-config/platform-config.service';
 import { MediaService } from './media.service';
 import { CreateMediaUploadDto, MediaUsage, UploadMediaType } from './dto/media.dto';
 
@@ -17,6 +18,10 @@ describe('MediaService', () => {
     ['media.secretAccessKey', 'test-secret-access-key'],
   ]);
 
+  const mockPlatformConfigService = {
+    getBoolean: jest.fn().mockResolvedValue(true),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -27,6 +32,7 @@ describe('MediaService', () => {
             get: (key: string) => configValues.get(key),
           },
         },
+        { provide: PlatformConfigService, useValue: mockPlatformConfigService },
       ],
     }).compile();
 
