@@ -10,6 +10,7 @@ import { FulfilmentEvent } from '../orders/entities/fulfilment-event.entity';
 import { Order } from '../orders/entities/order.entity';
 import { OrderStatus } from '../orders/enums/order-status.enum';
 import { PAYMENTS_QUEUE } from '../queue/queue.constants';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { UsersService } from '../users/users.service';
 import {
   PaymentIntent,
@@ -113,6 +114,10 @@ describe('PaymentsService', () => {
     findById: jest.fn(),
   };
 
+  const mockSubscriptionsService = {
+    processPaystackWebhook: jest.fn(),
+  };
+
   const mockConfigService = {
     get: jest.fn((key: string) => {
       switch (key) {
@@ -162,6 +167,10 @@ describe('PaymentsService', () => {
         { provide: ConfigService, useValue: mockConfigService },
         { provide: PaystackService, useValue: mockPaystackService },
         { provide: UsersService, useValue: mockUsersService },
+        {
+          provide: SubscriptionsService,
+          useValue: mockSubscriptionsService,
+        },
       ],
     }).compile();
 

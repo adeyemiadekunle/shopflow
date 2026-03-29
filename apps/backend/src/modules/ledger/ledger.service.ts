@@ -108,4 +108,20 @@ export class LedgerService {
     });
     return account ? Number(account.balance) : 0;
   }
+
+  async hasRecordedReference(params: {
+    reference: string;
+    eventType: LedgerEventType;
+    accountType?: LedgerAccountType;
+  }): Promise<boolean> {
+    const count = await this.entryRepo.count({
+      where: {
+        reference: params.reference,
+        eventType: params.eventType,
+        ...(params.accountType ? { accountType: params.accountType } : {}),
+      },
+    });
+
+    return count > 0;
+  }
 }

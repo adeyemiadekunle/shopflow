@@ -47,6 +47,30 @@ export class SellerSubscription {
   @Column({ name: 'paystack_subscription_code', nullable: true })
   paystackSubscriptionCode?: string;
 
+  @Column({ name: 'paystack_plan_code', nullable: true, length: 100 })
+  paystackPlanCode?: string;
+
+  @Column({ name: 'paystack_customer_code', nullable: true, length: 100 })
+  paystackCustomerCode?: string;
+
+  @Column({ name: 'paystack_email_token', nullable: true, length: 100 })
+  paystackEmailToken?: string;
+
+  @Column({ name: 'checkout_reference', nullable: true, length: 100 })
+  checkoutReference?: string;
+
+  @Column({ name: 'checkout_authorization_url', nullable: true })
+  checkoutAuthorizationUrl?: string;
+
+  @Column({ name: 'idempotency_key', nullable: true, length: 200 })
+  idempotencyKey?: string;
+
+  @Column({ name: 'latest_charge_reference', nullable: true, length: 100 })
+  latestChargeReference?: string;
+
+  @Column({ name: 'last_invoice_code', nullable: true, length: 100 })
+  lastInvoiceCode?: string;
+
   /** Last successful billing date */
   @Column({ name: 'last_billed_at', type: 'timestamp', nullable: true })
   lastBilledAt?: Date;
