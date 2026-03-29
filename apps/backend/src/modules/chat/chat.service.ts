@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PlatformConfigKey } from '../platform-config/constants/platform-config.keys';
@@ -26,6 +31,31 @@ export class ChatService {
 
     if (!chatEnabled) {
       throw new NotFoundException('Chat is not enabled right now');
+    }
+  }
+
+  private async getConversationOrThrow(
+    conversationId: string,
+  ): Promise<Conversation> {
+    const convo = await this.convoRepo.findOne({
+      where: { id: conversationId },
+    });
+    if (!convo) {
+      throw new NotFoundException('Conversation not found');
+    }
+    return convo;
+  }
+
+  private ensureParticipant(
+    convo: Conversation,
+    userId: string,
+    sellerProfileId?: string,
+  ): void {
+    const isParticipant =
+      convo.buyerId === userId || convo.sellerProfileId === sellerProfileId;
+
+    if (!isParticipant) {
+      throw new ForbiddenException('Not a participant in this conversation');
     }
   }
 
@@ -80,9 +110,14 @@ export class ChatService {
 
   async getMessages(
     conversationId: string,
+    userId: string,
+    sellerProfileId?: string,
     page = 1,
     limit = 50,
   ): Promise<ChatMessage[]> {
+    const convo = await this.getConversationOrThrow(conversationId);
+    this.ensureParticipant(convo, userId, sellerProfileId);
+
     return this.msgRepo.find({
       where: { conversationId },
       relations: ['sender'],
@@ -95,21 +130,25 @@ export class ChatService {
   async sendMessage(
     conversationId: string,
     senderId: string,
+    sellerProfileId: string | undefined,
     senderRole: MessageSenderRole,
     content: string,
   ): Promise<ChatMessage> {
-    const convo = await this.convoRepo.findOne({
-      where: { id: conversationId },
-    });
-    if (!convo) throw new NotFoundException('Conversation not found');
     await this.assertChatEnabled();
+    const convo = await this.getConversationOrThrow(conversationId);
+    this.ensureParticipant(convo, senderId, sellerProfileId);
+
+    const normalizedContent = content.trim();
+    if (!normalizedContent) {
+      throw new BadRequestException('Message content cannot be empty');
+    }
 
     const msg = await this.msgRepo.save(
       this.msgRepo.create({
         conversationId,
         senderId,
         senderRole,
-        content,
+        content: normalizedContent,
       }),
     );
 
@@ -117,7 +156,14 @@ export class ChatService {
     return msg;
   }
 
-  async markAsRead(conversationId: string, readerId: string): Promise<void> {
+  async markAsRead(
+    conversationId: string,
+    readerId: string,
+    sellerProfileId?: string,
+  ): Promise<void> {
+    const convo = await this.getConversationOrThrow(conversationId);
+    this.ensureParticipant(convo, readerId, sellerProfileId);
+
     await this.msgRepo
       .createQueryBuilder()
       .update(ChatMessage)

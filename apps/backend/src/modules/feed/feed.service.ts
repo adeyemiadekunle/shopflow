@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
+import { Product, ProductStatus } from '../catalog/entities/product.entity';
 import { MediaService } from '../media/media.service';
 import { UploadMediaType } from '../media/dto/media.dto';
 import { PlatformConfigKey } from '../platform-config/constants/platform-config.keys';
@@ -28,9 +29,23 @@ export class FeedService {
     private readonly commentRepo: Repository<FeedComment>,
     @InjectRepository(FeedFollow)
     private readonly followRepo: Repository<FeedFollow>,
+    @InjectRepository(Product)
+    private readonly productRepo: Repository<Product>,
     private readonly mediaService: MediaService,
     private readonly platformConfigService: PlatformConfigService,
   ) {}
+
+  private async getPublishedPostOrThrow(postId: string): Promise<FeedPost> {
+    const post = await this.postRepo.findOne({
+      where: { id: postId, status: FeedPostStatus.PUBLISHED },
+    });
+
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    return post;
+  }
 
   // ─── Posts ──────────────────────────────────────────────────────────────────
 
@@ -81,6 +96,22 @@ export class FeedService {
       if (!this.mediaService.isAllowedPublicUrl(item.url.trim())) {
         throw new ForbiddenException(
           'Feed media must use the configured CloudFront media base URL',
+        );
+      }
+    }
+
+    if (dto.productId) {
+      const taggedProduct = await this.productRepo.findOne({
+        where: {
+          id: dto.productId,
+          sellerProfileId,
+          status: ProductStatus.ACTIVE,
+        },
+      });
+
+      if (!taggedProduct) {
+        throw new ForbiddenException(
+          'Tagged product must be one of your active catalog products',
         );
       }
     }
@@ -165,6 +196,8 @@ export class FeedService {
 
   /** Toggle like — idempotent. Returns true if now liked, false if unliked. */
   async toggleLike(postId: string, userId: string): Promise<boolean> {
+    await this.getPublishedPostOrThrow(postId);
+
     const existing = await this.likeRepo.findOne({
       where: { postId, userId },
     });
@@ -185,6 +218,8 @@ export class FeedService {
     page = 1,
     limit = 20,
   ): Promise<FeedComment[]> {
+    await this.getPublishedPostOrThrow(postId);
+
     return this.commentRepo.find({
       where: { postId },
       relations: ['user'],
@@ -199,6 +234,8 @@ export class FeedService {
     userId: string,
     dto: CreateCommentDto,
   ): Promise<FeedComment> {
+    await this.getPublishedPostOrThrow(postId);
+
     const comment = await this.commentRepo.save(
       this.commentRepo.create({ postId, userId, content: dto.content }),
     );
