@@ -13,6 +13,7 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
 
 // Modules
 import { HealthModule } from './modules/health/health.module';
+import { AddressesModule } from './modules/addresses/addresses.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { SellersModule } from './modules/sellers/sellers.module';
@@ -32,6 +33,7 @@ import { MetricsController } from './modules/health/metrics.controller';
 // Entities
 import { User } from './modules/users/entities/user.entity';
 import { SellerProfile } from './modules/sellers/entities/seller-profile.entity';
+import { BuyerAddress } from './modules/addresses/entities/buyer-address.entity';
 import { SellerKyc } from './modules/sellers/entities/seller-kyc.entity';
 import { BankAccount } from './modules/sellers/entities/bank-account.entity';
 import { Product } from './modules/catalog/entities/product.entity';
@@ -109,6 +111,7 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
         logging: config.get<boolean>('database.logging') ?? false,
         entities: [
           User,
+          BuyerAddress,
           SellerProfile,
           SellerKyc,
           BankAccount,
@@ -159,6 +162,7 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
 
     // ── Feature modules ───────────────────────────────────────────────────────
     HealthModule,
+    AddressesModule,
     AuthModule,
     UsersModule,
     SellersModule,
