@@ -13,6 +13,7 @@
 - [Running the App](#running-the-app)
 - [API Modules](#api-modules)
 - [Platform Config](#platform-config)
+- [Cart](#cart--apiv1cart)
 - [Subscription Tiers](#subscription-tiers)
 - [Testing](#testing)
 - [Docker & Infrastructure](#docker--infrastructure)
@@ -276,20 +277,40 @@ Refund rules:
 - The order stays `refund_pending` until Paystack confirms `refund.processed`.
 - If Paystack requests buyer bank details, admin can retry with bank id, account number, and currency.
 
+### Cart — `/api/v1/cart`
+
+Buyer cart lines are grouped by seller because checkout still creates one order per seller.
+
+| Method | Route | Auth | Description |
+|---|---|---|---|
+| GET | `/cart` | Buyer | Get the current buyer cart grouped by seller |
+| POST | `/cart/items` | Buyer | Add an item to the buyer cart |
+| PATCH | `/cart/items/:id` | Buyer | Update cart item quantity |
+| DELETE | `/cart/items/:id` | Buyer | Remove one cart item |
+| DELETE | `/cart/sellers/:sellerProfileId` | Buyer | Clear one seller group from the cart |
+| POST | `/cart/sellers/:sellerProfileId/checkout` | Buyer | Create one seller-scoped order from the selected seller group |
+
+Cart rule:
+
+- Buyers can collect items from many sellers in the UI.
+- Checkout still happens one seller group at a time because delivery quotes, disputes, payouts, and settlement are seller-scoped.
+
 ### Frontend Checkout Flow
 
 Recommended frontend implementation:
 
-1. Buyer creates the order with `POST /api/v1/orders`.
-2. Seller sends the delivery quote with `POST /api/v1/orders/:id/quote`.
-3. Buyer accepts the quote with `POST /api/v1/orders/:id/quote-response`.
-4. Frontend calls `POST /api/v1/payments/checkout/:orderId` with the buyer access token.
-5. Backend returns `authorizationUrl`, `reference`, and `accessCode`.
-6. Frontend redirects the buyer to `authorizationUrl`.
-7. After Paystack returns to the frontend, call `POST /api/v1/payments/verify` with the `reference`.
-8. Seller progresses the order with `/prepare`, `/ship`, and `/deliver`.
-9. Frontend refreshes the order with `GET /api/v1/orders/:id`.
-10. Seller funds remain on hold until the return-policy window passes or any dispute is resolved.
+1. Buyer adds items with `POST /api/v1/cart/items`.
+2. Frontend reads seller-grouped cart data with `GET /api/v1/cart`.
+3. Buyer creates one seller-scoped order with `POST /api/v1/cart/sellers/:sellerProfileId/checkout`.
+4. Seller sends the delivery quote with `POST /api/v1/orders/:id/quote`.
+5. Buyer accepts the quote with `POST /api/v1/orders/:id/quote-response`.
+6. Frontend calls `POST /api/v1/payments/checkout/:orderId` with the buyer access token.
+7. Backend returns `authorizationUrl`, `reference`, and `accessCode`.
+8. Frontend redirects the buyer to `authorizationUrl`.
+9. After Paystack returns to the frontend, call `POST /api/v1/payments/verify` with the `reference`.
+10. Seller progresses the order with `/prepare`, `/ship`, and `/deliver`.
+11. Frontend refreshes the order with `GET /api/v1/orders/:id`.
+12. Seller funds remain on hold until the return-policy window passes or any dispute is resolved.
 
 Example checkout init request:
 
