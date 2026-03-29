@@ -55,10 +55,10 @@ What is still missing is the production-grade async and correctness layer around
 
 ## Phase C: Ledger Integration
 
-- [ ] Post ledger entries when payment is confirmed
-- [ ] Record buyer payment into clearing account
+- [x] Post ledger entries when payment is confirmed
+- [x] Record buyer payment into clearing account
 - [ ] Record platform fee accrual
-- [ ] Record seller pending allocation
+- [x] Record seller pending allocation
 - [ ] Make ledger posting idempotent for a payment reference
 - [ ] Wrap payment success + ledger posting in safe transactional boundaries
 - [ ] Ensure order paid state cannot diverge silently from ledger state

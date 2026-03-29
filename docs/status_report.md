@@ -14,6 +14,7 @@ Latest verified backend state:
 - full backend test suite passing
 - production build passing
 - provider-aware payment flow on `stage`
+- local Docker API rebuilt successfully and verified healthy
 
 ## Module Status
 
@@ -45,10 +46,11 @@ Implemented:
 - KYC data model
 - payout bank account model and verification path
 - seller self-service profile/onboarding endpoints
+- seller analytics summary endpoint for dashboard use
 
 Still missing / optional:
 - richer KYC/provider integrations
-- seller analytics
+- deeper seller reporting / charting beyond the current summary
 
 ### Catalog
 
@@ -195,9 +197,11 @@ Implemented:
 - feature flags
 - default checkout provider config
 - default payout provider config
+- admin analytics summary endpoint for platform dashboard use
 
 Still missing / optional:
 - admin UX/reporting polish
+- exportable operational / finance reports
 
 ### Queue / Observability
 
@@ -225,10 +229,9 @@ Still missing / optional:
 
 ## Best Next Steps
 
-1. Seller analytics
-2. Platform/admin analytics
-3. Queue and ops hardening
-4. Media/video processing polish
-5. Notification expansion
-6. Final finance / ledger reporting pass
-7. Cleanup sweep for dead code and stale docs
+1. Queue and ops hardening
+2. Media/video processing polish
+3. Notification expansion
+4. Final finance / ledger reporting pass
+5. Admin reporting / exports
+6. Cleanup sweep for dead code, module wiring, and stale docs

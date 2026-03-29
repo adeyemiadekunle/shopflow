@@ -8,10 +8,12 @@ import { FeedService } from './feed.service';
 import { FeedController } from './feed.controller';
 import { MediaModule } from '../media/media.module';
 import { Product } from '../catalog/entities/product.entity';
+import { PlatformConfigModule } from '../platform-config/platform-config.module';
 
 @Module({
   imports: [
     MediaModule,
+    PlatformConfigModule,
     TypeOrmModule.forFeature([
       FeedPost,
       FeedLike,

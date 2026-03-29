@@ -8,12 +8,14 @@ import { CatalogService } from './catalog.service';
 import { CatalogController } from './catalog.controller';
 import { MediaModule } from '../media/media.module';
 import { SellersModule } from '../sellers/sellers.module';
+import { PlatformConfigModule } from '../platform-config/platform-config.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Product, ProductVariant, ProductMedia, Category]),
     MediaModule,
     SellersModule,
+    PlatformConfigModule,
   ],
   providers: [CatalogService],
   controllers: [CatalogController],

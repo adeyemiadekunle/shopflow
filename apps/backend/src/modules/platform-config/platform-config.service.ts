@@ -369,7 +369,7 @@ export class PlatformConfigService implements OnModuleInit {
         marketName: this.getMarketName(),
         countryCode: this.getCountryCode(),
         currency: this.getCurrency(),
-        supportEmail: supportEmail ?? 'support@rands.ng',
+        supportEmail: supportEmail ?? 'support@rands.com.ng',
       },
       config: {
         defaultCheckoutProvider,

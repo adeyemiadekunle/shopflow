@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SellerProfile } from './entities/seller-profile.entity';
 import { SellerKyc } from './entities/seller-kyc.entity';
@@ -22,7 +22,7 @@ import { LedgerAccount } from '../ledger/entities/ledger-account.entity';
       Refund,
       LedgerAccount,
     ]),
-    PaymentsModule,
+    forwardRef(() => PaymentsModule),
   ],
   providers: [SellersService],
   controllers: [SellersController],

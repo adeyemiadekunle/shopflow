@@ -41,7 +41,7 @@ type QueueConnectionOptions = NonNullable<QueueOptions['connection']>;
       ProductVariant,
     ]),
     AddressesModule,
-    SellersModule,
+    forwardRef(() => SellersModule),
     PlatformConfigModule,
     LedgerModule,
     forwardRef(() => RefundsModule),

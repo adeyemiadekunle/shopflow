@@ -48,8 +48,8 @@ Current source of truth for module status lives in:
 
 ### Product / UX
 
-- [ ] Add seller analytics endpoints and dashboard-ready summaries
-- [ ] Add platform/admin analytics endpoints and dashboard-ready summaries
+- [x] Add seller analytics endpoints and dashboard-ready summaries
+- [x] Add platform/admin analytics endpoints and dashboard-ready summaries
 - [ ] Add richer catalog/feed media polish
 - [ ] Add video-processing pipeline after image-first rollout
 - [ ] Add first-time checkout support for separate raw `billingAddress`
@@ -80,14 +80,14 @@ Current source of truth for module status lives in:
 
 - [ ] Refresh stale counts and examples in README files over time
 - [ ] Remove dead leftover module folders that are no longer wired
+- [ ] Audit module imports for runtime DI issues surfaced only at app boot
 - [ ] Keep `docs/status_report.md` updated at each major milestone
 
 ## Suggested Next Order
 
-1. Seller analytics
-2. Platform/admin analytics
-3. Queue and ops hardening
-4. Media/video processing polish
-5. Notification expansion
-6. Final finance and ledger reporting pass
-7. Cleanup and documentation sweep
+1. Queue and ops hardening
+2. Media/video processing polish
+3. Notification expansion
+4. Final finance and ledger reporting pass
+5. Admin reporting / exports
+6. Cleanup and documentation sweep
