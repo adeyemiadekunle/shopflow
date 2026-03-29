@@ -227,7 +227,7 @@ Settlement rule:
 - After the seller marks an order delivered, the platform starts the configured return-policy hold window.
 - Seller funds are released automatically only after the hold window expires with no open dispute.
 - If the buyer opens a dispute, release is blocked until admin resolution.
-- Buyer-favour dispute resolution moves funds into `refund_reserve`; seller-favour resolution releases held funds to the seller.
+- Buyer-favour dispute resolution initiates a refund and moves the order into `refund_pending`; seller-favour resolution releases held funds to the seller.
 
 ### Payments — `/api/v1/payments`
 
@@ -258,6 +258,23 @@ Admin-managed seller payouts from `seller_available` through Paystack Transfers.
 | POST | `/payouts/admin` | Admin | Create a payout request for a seller |
 | POST | `/payouts/admin/:id/approve` | Admin | Reserve seller available balance into payout payable |
 | POST | `/payouts/admin/:id/send` | Admin | Send an approved payout through Paystack Transfers |
+
+### Refunds â€” `/api/v1/refunds`
+
+Admin-managed refunds tied to the original Paystack transaction while seller funds are still unreleased.
+
+| Method | Route | Auth | Description |
+|---|---|---|---|
+| GET | `/refunds/admin` | Admin | List recent refund records |
+| POST | `/refunds/admin` | Admin | Initiate a refund for an eligible paid order |
+| POST | `/refunds/admin/:id/retry` | Admin | Retry a `needs_attention` refund with buyer bank details |
+
+Refund rules:
+
+- Refunds currently only run before seller funds are released.
+- Refund initiation moves money from `seller_pending` into `refund_reserve`.
+- The order stays `refund_pending` until Paystack confirms `refund.processed`.
+- If Paystack requests buyer bank details, admin can retry with bank id, account number, and currency.
 
 ### Frontend Checkout Flow
 

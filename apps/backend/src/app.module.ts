@@ -25,6 +25,7 @@ import { PlatformConfigModule } from './modules/platform-config/platform-config.
 import { FeedModule } from './modules/feed/feed.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { PayoutsModule } from './modules/payouts/payouts.module';
+import { RefundsModule } from './modules/refunds/refunds.module';
 import { MetricsController } from './modules/health/metrics.controller';
 
 // Entities
@@ -57,6 +58,7 @@ import { FeedFollow } from './modules/feed/entities/feed-follow.entity';
 import { Conversation } from './modules/chat/entities/conversation.entity';
 import { ChatMessage } from './modules/chat/entities/chat-message.entity';
 import { Payout } from './modules/payouts/entities/payout.entity';
+import { Refund } from './modules/refunds/entities/refund.entity';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
 
@@ -118,6 +120,7 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
           FulfilmentEvent,
           DisputeCase,
           PaymentIntent,
+          Refund,
           PaymentReconciliationRun,
           PaymentReconciliationIssue,
           WebhookEvent,
@@ -165,6 +168,7 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
     FeedModule,
     ChatModule,
     PayoutsModule,
+    RefundsModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },

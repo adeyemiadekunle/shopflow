@@ -29,6 +29,7 @@ import { UserRole } from '../users/enums/user-role.enum';
 import { PAYMENTS_QUEUE, PaymentJobName } from '../queue/queue.constants';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { PayoutsService } from '../payouts/payouts.service';
+import { RefundsService } from '../refunds/refunds.service';
 import {
   InitializeCheckoutDto,
   PaystackCheckoutChannel,
@@ -103,6 +104,8 @@ export class PaymentsService {
     private readonly subscriptionsService: SubscriptionsService,
     @Inject(forwardRef(() => PayoutsService))
     private readonly payoutsService: PayoutsService,
+    @Inject(forwardRef(() => RefundsService))
+    private readonly refundsService: RefundsService,
   ) {
     const countOpenIssues = this.countOpenReconciliationIssues.bind(this);
     const getLatestRun = this.getLatestReconciliationRun.bind(this);
@@ -1108,6 +1111,16 @@ export class PaymentsService {
         event.eventType === 'transfer.reversed'
       ) {
         await this.payoutsService.processPaystackWebhook(event.eventType, body);
+      }
+
+      if (
+        event.eventType === 'refund.pending' ||
+        event.eventType === 'refund.processing' ||
+        event.eventType === 'refund.needs-attention' ||
+        event.eventType === 'refund.failed' ||
+        event.eventType === 'refund.processed'
+      ) {
+        await this.refundsService.processPaystackWebhook(event.eventType, body);
       }
 
       await this.webhookRepo.save({

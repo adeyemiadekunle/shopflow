@@ -12,6 +12,7 @@ import { Order } from '../orders/entities/order.entity';
 import { OrderStatus } from '../orders/enums/order-status.enum';
 import { PAYMENTS_QUEUE } from '../queue/queue.constants';
 import { PayoutsService } from '../payouts/payouts.service';
+import { RefundsService } from '../refunds/refunds.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { UsersService } from '../users/users.service';
 import {
@@ -130,6 +131,10 @@ describe('PaymentsService', () => {
     processPaystackWebhook: jest.fn(),
   };
 
+  const mockRefundsService = {
+    processPaystackWebhook: jest.fn(),
+  };
+
   const mockConfigService = {
     get: jest.fn((key: string) => {
       switch (key) {
@@ -188,6 +193,10 @@ describe('PaymentsService', () => {
         {
           provide: PayoutsService,
           useValue: mockPayoutsService,
+        },
+        {
+          provide: RefundsService,
+          useValue: mockRefundsService,
         },
       ],
     }).compile();
@@ -523,6 +532,30 @@ describe('PaymentsService', () => {
     expect(mockWebhookRepo.save).toHaveBeenCalledWith(
       expect.objectContaining({
         id: 'webhook-1',
+        processed: true,
+      }),
+    );
+  });
+
+  it('processWebhookEvent() should forward refund webhooks to the refunds service', async () => {
+    mockWebhookRepo.findOne.mockResolvedValue({
+      id: 'webhook-refund-1',
+      eventType: 'refund.processed',
+      reference: 'PAY-RND-100-TESTREF',
+      processed: false,
+      rawPayload: { event: 'refund.processed', data: { id: 44 } },
+    });
+    mockRefundsService.processPaystackWebhook.mockResolvedValue(true);
+
+    await service.processWebhookEvent('webhook-refund-1');
+
+    expect(mockRefundsService.processPaystackWebhook).toHaveBeenCalledWith(
+      'refund.processed',
+      { event: 'refund.processed', data: { id: 44 } },
+    );
+    expect(mockWebhookRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'webhook-refund-1',
         processed: true,
       }),
     );

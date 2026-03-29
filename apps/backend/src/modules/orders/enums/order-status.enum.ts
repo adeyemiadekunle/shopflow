@@ -11,6 +11,7 @@ export enum OrderStatus {
   DELIVERED_PENDING_CONFIRMATION = 'delivered_pending_confirmation',
   COMPLETED = 'completed',
   DISPUTE_OPEN = 'dispute_open',
+  REFUND_PENDING = 'refund_pending',
   REFUNDED = 'refunded',
   CANCELLED = 'cancelled',
 }
@@ -36,15 +37,23 @@ export const ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   ],
   [OrderStatus.QUOTE_DECLINED]: [OrderStatus.CANCELLED],
   [OrderStatus.PAYMENT_PENDING]: [OrderStatus.PAID, OrderStatus.CANCELLED],
-  [OrderStatus.PAID]: [OrderStatus.SELLER_PREPARING, OrderStatus.REFUNDED],
+  [OrderStatus.PAID]: [
+    OrderStatus.SELLER_PREPARING,
+    OrderStatus.REFUND_PENDING,
+  ],
   [OrderStatus.SELLER_PREPARING]: [OrderStatus.SHIPPED],
   [OrderStatus.SHIPPED]: [OrderStatus.DELIVERED_PENDING_CONFIRMATION],
   [OrderStatus.DELIVERED_PENDING_CONFIRMATION]: [
     OrderStatus.COMPLETED,
     OrderStatus.DISPUTE_OPEN,
+    OrderStatus.REFUND_PENDING,
   ],
   [OrderStatus.COMPLETED]: [],
-  [OrderStatus.DISPUTE_OPEN]: [OrderStatus.COMPLETED, OrderStatus.REFUNDED],
+  [OrderStatus.DISPUTE_OPEN]: [
+    OrderStatus.COMPLETED,
+    OrderStatus.REFUND_PENDING,
+  ],
+  [OrderStatus.REFUND_PENDING]: [OrderStatus.REFUNDED],
   [OrderStatus.REFUNDED]: [],
   [OrderStatus.CANCELLED]: [],
 };

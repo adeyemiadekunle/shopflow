@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ForbiddenException,
+  forwardRef,
   Inject,
   Injectable,
   NotFoundException,
@@ -23,6 +24,7 @@ import {
 } from '../ledger/enums/ledger.enum';
 import { PlatformConfigService } from '../platform-config/platform-config.service';
 import { ORDERS_QUEUE, OrderJobName } from '../queue/queue.constants';
+import { RefundsService } from '../refunds/refunds.service';
 import { SellersService } from '../sellers/sellers.service';
 import { UserRole } from '../users/enums/user-role.enum';
 import {
@@ -68,6 +70,8 @@ export class OrdersService {
     private readonly sellersService: SellersService,
     private readonly platformConfigService: PlatformConfigService,
     private readonly ledgerService: LedgerService,
+    @Inject(forwardRef(() => RefundsService))
+    private readonly refundsService: RefundsService,
   ) {}
 
   generateReference(): string {
@@ -291,58 +295,6 @@ export class OrdersService {
         orderId: order.id,
         actorId,
         eventType: LedgerEventType.HOLD_RELEASED,
-        reference,
-        notes,
-      });
-    }
-  }
-
-  private async moveSellerPendingToRefundReserve(
-    order: Order,
-    actorId: string,
-    notes: string,
-  ): Promise<void> {
-    const amount = this.getSettlementAmount(order);
-    if (amount <= 0) {
-      return;
-    }
-
-    await this.ensureSellerSettlementAccounts(order);
-
-    const reference = `refund-reserve:${order.id}`;
-    const pendingAlreadyMoved = await this.ledgerService.hasRecordedReference({
-      reference,
-      eventType: LedgerEventType.REFUND_INITIATED,
-      accountType: LedgerAccountType.SELLER_PENDING,
-    });
-    const reserveAlreadyMoved = await this.ledgerService.hasRecordedReference({
-      reference,
-      eventType: LedgerEventType.REFUND_INITIATED,
-      accountType: LedgerAccountType.REFUND_RESERVE,
-    });
-
-    if (!pendingAlreadyMoved) {
-      await this.ledgerService.record({
-        accountType: LedgerAccountType.SELLER_PENDING,
-        ownerId: order.sellerProfileId,
-        amount: -amount,
-        currency: order.currency,
-        orderId: order.id,
-        actorId,
-        eventType: LedgerEventType.REFUND_INITIATED,
-        reference,
-        notes,
-      });
-    }
-
-    if (!reserveAlreadyMoved) {
-      await this.ledgerService.record({
-        accountType: LedgerAccountType.REFUND_RESERVE,
-        amount,
-        currency: order.currency,
-        orderId: order.id,
-        actorId,
-        eventType: LedgerEventType.REFUND_INITIATED,
         reference,
         notes,
       });
@@ -1000,7 +952,7 @@ export class OrdersService {
       dto.resolutionNotes?.trim() ??
       (dto.outcome === ResolveDisputeOutcome.SELLER
         ? 'Admin resolved the dispute in favour of the seller.'
-        : 'Admin resolved the dispute in favour of the buyer and moved funds into refund reserve.');
+        : 'Admin resolved the dispute in favour of the buyer and initiated a refund.');
 
     if (dto.outcome === ResolveDisputeOutcome.SELLER) {
       await this.disputeRepo.save({
@@ -1033,18 +985,11 @@ export class OrdersService {
       );
     }
 
-    await this.moveSellerPendingToRefundReserve(order, adminId, resolutionNotes);
-
     await this.disputeRepo.save({
       ...dispute,
       status: DisputeStatus.RESOLVED_BUYER,
       resolutionNotes,
       resolvedAt: new Date(),
-    });
-
-    await this.orderRepo.save({
-      ...order,
-      status: OrderStatus.REFUNDED,
     });
 
     await this.logEvent(
@@ -1057,6 +1002,13 @@ export class OrdersService {
         outcome: ResolveDisputeOutcome.BUYER,
       },
     );
+
+    await this.refundsService.createRefundForResolvedDispute({
+      orderId: order.id,
+      adminId,
+      reason: resolutionNotes,
+      customerNote: 'Refund approved after dispute resolution.',
+    });
 
     return this.findById(order.id);
   }

@@ -72,6 +72,7 @@ Copy `.env.example` to `.env` and fill in:
 | orders | `/orders` | Buyer order creation, seller quoting, delivery progression, disputes, and scoped order access |
 | payments | `/payments` | Paystack Checkout init, verify, webhook handling, and admin reconciliation reporting |
 | payouts | `/payouts` | Admin-managed seller payout requests, approvals, sends, and payout summaries |
+| refunds | `/refunds` | Admin-managed refunds, Paystack refund retries, and refund state tracking |
 | ledger | `/ledger` | Immutable double-entry ledger (12 event types, 7 account types); atomic `record()` with pessimistic lock; currency from platform config |
 | subscriptions | `/subscriptions` | Seller tiers, checkout, recurring verification, cancellation, and admin plan sync |
 | platform-config | `/platform-config` | Market identity from env vars (currency, country); business rules (commission, return policy) managed via admin API |
@@ -154,6 +155,7 @@ Important frontend rules:
 - Use the returned `authorizationUrl` for redirect-based checkout.
 - Treat the webhook-driven backend update as the final payment truth; the verify endpoint is mainly for immediate UI refresh after Paystack redirects back.
 - Order funds stay in `seller_pending` after payment and only move to `seller_available` after the return-policy hold window expires without an open dispute.
+- Buyer-favour dispute resolution now puts the order into `refund_pending` until Paystack confirms the refund is processed.
 
 ## Admin Payout Flow
 
@@ -168,3 +170,16 @@ Important payout rules:
 - Only `seller_available` funds are eligible for payout.
 - The seller bank account must already be verified.
 - Failed or reversed transfers restore funds from `payout_payable` back to `seller_available`.
+
+## Admin Refund Flow
+
+1. Review eligible paid orders whose seller funds are still unreleased.
+2. Start a refund with `POST /api/v1/refunds/admin`.
+3. If Paystack returns `needs_attention`, retry with `POST /api/v1/refunds/admin/:id/retry`.
+4. Let Paystack refund webhooks finalize the refund and move the order from `refund_pending` to `refunded`.
+
+Important refund rules:
+
+- Refunds are currently limited to orders whose seller funds have not been released.
+- Refund initiation moves funds from `seller_pending` into `refund_reserve`.
+- Buyer bank details are only needed when Paystack asks for them on retry.

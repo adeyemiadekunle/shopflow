@@ -23,6 +23,7 @@ import { PaymentsProcessor } from './payments.processor';
 import { PaymentsService } from './payments.service';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { PayoutsModule } from '../payouts/payouts.module';
+import { RefundsModule } from '../refunds/refunds.module';
 
 type QueueConnectionOptions = NonNullable<QueueOptions['connection']>;
 
@@ -41,6 +42,7 @@ type QueueConnectionOptions = NonNullable<QueueOptions['connection']>;
     LedgerModule,
     forwardRef(() => SubscriptionsModule),
     forwardRef(() => PayoutsModule),
+    forwardRef(() => RefundsModule),
   ],
   providers: [
     {

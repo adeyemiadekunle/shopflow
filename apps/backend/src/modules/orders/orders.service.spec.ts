@@ -11,6 +11,7 @@ import { ProductVariant } from '../catalog/entities/product-variant.entity';
 import { LedgerService } from '../ledger/ledger.service';
 import { PlatformConfigService } from '../platform-config/platform-config.service';
 import { ORDERS_QUEUE } from '../queue/queue.constants';
+import { RefundsService } from '../refunds/refunds.service';
 import { SellersService } from '../sellers/sellers.service';
 import { UserRole } from '../users/enums/user-role.enum';
 import { DeliveryQuote, QuoteStatus } from './entities/delivery-quote.entity';
@@ -125,6 +126,10 @@ describe('OrdersService', () => {
     add: jest.fn(),
   };
 
+  const mockRefundsService = {
+    createRefundForResolvedDispute: jest.fn(),
+  };
+
   const mockConfigService = {
     get: jest.fn((key: string) => {
       switch (key) {
@@ -148,6 +153,11 @@ describe('OrdersService', () => {
     mockOrdersQueue.add.mockResolvedValue({});
     mockDisputeRepo.findOne.mockResolvedValue(null);
     mockLedgerService.hasRecordedReference.mockResolvedValue(false);
+    mockRefundsService.createRefundForResolvedDispute.mockResolvedValue({
+      id: 'refund-1',
+      orderId: 'order-1',
+      status: 'pending',
+    });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -176,6 +186,7 @@ describe('OrdersService', () => {
           useValue: mockPlatformConfigService,
         },
         { provide: LedgerService, useValue: mockLedgerService },
+        { provide: RefundsService, useValue: mockRefundsService },
       ],
     }).compile();
 
@@ -573,7 +584,7 @@ describe('OrdersService', () => {
     expect(order.status).toBe(OrderStatus.COMPLETED);
   });
 
-  it('resolveDispute() should move seller funds into refund reserve for buyer-favour outcomes', async () => {
+  it('resolveDispute() should initiate a refund-pending flow for buyer-favour outcomes', async () => {
     mockDisputeRepo.findOne.mockResolvedValueOnce({
       id: 'dispute-2',
       orderId: 'order-1',
@@ -587,7 +598,7 @@ describe('OrdersService', () => {
       })
       .mockResolvedValueOnce({
         ...mockOrder,
-        status: OrderStatus.REFUNDED,
+        status: OrderStatus.REFUND_PENDING,
       });
 
     const order = await service.resolveDispute('dispute-2', 'admin-1', {
@@ -595,14 +606,20 @@ describe('OrdersService', () => {
       resolutionNotes: 'Admin approved a buyer-favour resolution.',
     });
 
-    expect(mockLedgerService.record).toHaveBeenCalledTimes(2);
-    expect(mockOrderRepo.save).toHaveBeenCalledWith(
+    expect(mockLedgerService.record).not.toHaveBeenCalled();
+    expect(mockDisputeRepo.save).toHaveBeenCalledWith(
       expect.objectContaining({
-        id: 'order-1',
-        status: OrderStatus.REFUNDED,
+        id: 'dispute-2',
+        status: DisputeStatus.RESOLVED_BUYER,
       }),
     );
-    expect(order.status).toBe(OrderStatus.REFUNDED);
+    expect(mockRefundsService.createRefundForResolvedDispute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderId: 'order-1',
+        adminId: 'admin-1',
+      }),
+    );
+    expect(order.status).toBe(OrderStatus.REFUND_PENDING);
   });
 
   it('findForUser() should block unrelated buyers from accessing the order', async () => {
