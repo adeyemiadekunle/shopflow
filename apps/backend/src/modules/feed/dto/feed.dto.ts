@@ -1,11 +1,21 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsEnum,
   IsNotEmpty,
   IsOptional,
   IsString,
   IsUUID,
+  ValidateNested,
 } from 'class-validator';
+import { MediaAssetDto, UploadMediaType } from '../../media/dto/media.dto';
+
+export class CreateFeedPostMediaDto extends MediaAssetDto {
+  @ApiPropertyOptional({ enum: UploadMediaType, default: UploadMediaType.IMAGE })
+  @IsEnum(UploadMediaType)
+  declare type: UploadMediaType;
+}
 
 export class CreateFeedPostDto {
   @ApiProperty({ example: 'Just dropped new ankara prints! 🔥' })
@@ -18,6 +28,13 @@ export class CreateFeedPostDto {
   @IsArray()
   @IsString({ each: true })
   mediaUrls?: string[];
+
+  @ApiPropertyOptional({ type: [CreateFeedPostMediaDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateFeedPostMediaDto)
+  media?: CreateFeedPostMediaDto[];
 
   @ApiPropertyOptional({ description: 'Tag a product from your catalog' })
   @IsOptional()

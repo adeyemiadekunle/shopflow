@@ -28,6 +28,7 @@ import { ChatModule } from './modules/chat/chat.module';
 import { PayoutsModule } from './modules/payouts/payouts.module';
 import { RefundsModule } from './modules/refunds/refunds.module';
 import { CartModule } from './modules/cart/cart.module';
+import { MediaModule } from './modules/media/media.module';
 import { MetricsController } from './modules/health/metrics.controller';
 
 // Entities
@@ -177,6 +178,7 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
     PayoutsModule,
     RefundsModule,
     CartModule,
+    MediaModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },

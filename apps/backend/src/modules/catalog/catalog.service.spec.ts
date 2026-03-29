@@ -1,6 +1,7 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { MediaService } from '../media/media.service';
 import { SellersService } from '../sellers/sellers.service';
 import { CatalogService } from './catalog.service';
 import { Category } from './entities/category.entity';
@@ -39,6 +40,10 @@ describe('CatalogService', () => {
     getByUserIdOrThrow: jest.fn(),
   };
 
+  const mockMediaService = {
+    isAllowedPublicUrl: jest.fn().mockReturnValue(true),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -64,6 +69,10 @@ describe('CatalogService', () => {
         {
           provide: SellersService,
           useValue: mockSellersService,
+        },
+        {
+          provide: MediaService,
+          useValue: mockMediaService,
         },
       ],
     }).compile();

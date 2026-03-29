@@ -112,6 +112,12 @@ See [`apps/backend/.env.example`](apps/backend/.env.example) for the full list. 
 | `APP_BASE_URL` | Backend base URL used for generated links |
 | `MAIL_FROM` / `SMTP_*` | SMTP sender and transport settings |
 | `FRONTEND_BASE_URL` | Frontend URL used in verification/reset links |
+| `AWS_REGION` | AWS region for S3 uploads (for example `eu-west-2`) |
+| `AWS_S3_BUCKET` | S3 bucket used for catalog and feed uploads |
+| `AWS_CLOUDFRONT_BASE_URL` | CloudFront base URL used for public media delivery |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | AWS credentials for presigned upload URL generation |
+| `MEDIA_PRESIGN_EXPIRES_IN_SECONDS` | Presigned upload URL lifetime in seconds |
+| `MEDIA_ALLOW_VIDEO_UPLOADS` | Enable video uploads after the image-first rollout is stable |
 | `PAYSTACK_SECRET_KEY` | Paystack secret key (from dashboard) |
 | `PAYSTACK_WEBHOOK_SECRET` | HMAC secret for webhook verification |
 | `PLATFORM_CURRENCY` | ISO 4217 currency code for this deployment (e.g. `NGN`, `GHS`) |
@@ -192,6 +198,20 @@ Products with variants (size/colour/stock), media, categories, and **discount su
 - `discountValue`: % off or flat currency amount
 - `discountStartsAt` / `discountEndsAt`: optional scheduled window
 - `effectivePrice`: denormalised for fast sorting/search
+
+Catalog media rules:
+
+- products should use CloudFront-delivered media URLs generated from the media upload flow
+- active products must include at least one image
+- video support exists in the model, but image upload is the primary rollout and video stays disabled unless `MEDIA_ALLOW_VIDEO_UPLOADS=true`
+
+### Media — `/api/v1/media`
+
+Presigned media upload flow for seller catalog and feed assets using AWS S3 + CloudFront.
+
+| Method | Route | Auth | Description |
+|---|---|---|---|
+| POST | `/media/upload-url` | Seller | Generate a presigned S3 upload URL and the final CloudFront public URL |
 
 ### Orders — `/api/v1/orders`
 
@@ -357,6 +377,66 @@ Frontend notes:
 - The backend, not the frontend, talks to Paystack.
 - Webhooks remain the source of truth for final payment confirmation; the verify endpoint is for immediate UI refresh after redirect.
 
+### Frontend Media Upload Flow
+
+Recommended image-first frontend flow for both catalog and feed:
+
+1. Seller requests a presigned upload URL with `POST /api/v1/media/upload-url`.
+2. Backend returns:
+   - `uploadUrl`
+   - `objectKey`
+   - `publicUrl`
+   - required upload `headers`
+3. Frontend uploads the file directly to S3 with `PUT uploadUrl`.
+4. Frontend stores the returned `publicUrl` and `objectKey` in the next catalog or feed API call.
+5. Catalog and feed payloads should use the CloudFront `publicUrl`, not temporary S3 URLs.
+
+Example upload-url request:
+
+```json
+{
+  "usage": "catalog_product",
+  "mediaType": "image",
+  "fileName": "ankara-drop-1.webp",
+  "contentType": "image/webp"
+}
+```
+
+Example upload-url response shape:
+
+```json
+{
+  "bucket": "rands-media-bucket",
+  "objectKey": "catalog/seller-123/2026/03/29/1711730000000-abc12345-ankara-drop-1.webp",
+  "uploadUrl": "https://...",
+  "publicUrl": "https://cdn.rands.ng/catalog/seller-123/2026/03/29/1711730000000-abc12345-ankara-drop-1.webp",
+  "headers": {
+    "Content-Type": "image/webp"
+  },
+  "expiresInSeconds": 900,
+  "mediaType": "image",
+  "usage": "catalog_product"
+}
+```
+
+Catalog create/update can then send media like:
+
+```json
+{
+  "title": "Ankara Shirt",
+  "basePrice": 15000,
+  "currency": "NGN",
+  "media": [
+    {
+      "type": "image",
+      "url": "https://cdn.rands.ng/catalog/seller-123/.../ankara-drop-1.webp",
+      "cdnKey": "catalog/seller-123/.../ankara-drop-1.webp",
+      "isPrimary": true
+    }
+  ]
+}
+```
+
 ### Ledger — `/api/v1/ledger` (internal)
 
 Immutable double-entry ledger — entries are **never updated or deleted** after creation.
@@ -404,6 +484,12 @@ Instagram-style social feed. Sellers create posts with text, media, and optional
 | POST | `/follow/:sellerProfileId` | Buyer | Follow seller |
 | DELETE | `/follow/:sellerProfileId` | Buyer | Unfollow seller |
 | GET | `/following` | User | List followed sellers |
+
+Feed media rules:
+
+- feed posts can now store typed media metadata as well as legacy `mediaUrls`
+- frontend should use the media upload flow first, then send the returned CloudFront URL into `media` or `mediaUrls`
+- image-first is the default rollout; video can be enabled later without changing the public upload contract
 
 ### Chat — `/api/v1/chat` + WebSocket
 
