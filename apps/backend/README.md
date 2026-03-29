@@ -67,6 +67,12 @@ Copy `.env.example` to `.env` and fill in:
 
 > `PLATFORM_*` vars are set once at deploy time and must not be changed on a live database. Business-rule settings (commission rate, return policy, etc.) remain configurable via the Admin API.
 
+Feature rollout model:
+
+- infrastructure capability is controlled by env when needed
+- platform live/on-off switches are controlled by admin through platform config
+- current gated seller features: feed posting, chat, catalog video uploads, and feed video uploads
+
 ## Modules
 
 | Module | Base path | Description |
@@ -83,39 +89,12 @@ Copy `.env.example` to `.env` and fill in:
 | cart | `/cart` | Buyer cart grouped by seller with seller-scoped checkout |
 | addresses | `/addresses` | Buyer saved delivery/billing address book with defaults |
 | ledger | `/ledger` | Immutable double-entry ledger (12 event types, 7 account types); atomic `record()` with pessimistic lock; currency from platform config |
-| subscriptions | `/subscriptions` | Seller tiers, checkout, recurring verification, cancellation, and admin plan sync |
 | platform-config | `/platform-config` | Market identity from env vars (currency, country); business rules (commission, return policy) managed via admin API |
 | feed | `/feed` | Instagram-style social feed: posts, likes, comments, follow/unfollow |
 | chat | `/chat` + WebSocket | Buyer↔seller 1:1 real-time messaging (Socket.IO) + REST conversation management |
 | health | `/health` | DB + memory health checks |
 | queue-health | `/health/queues` | Queue backlog summary for payments, orders, and dead-letter |
 | metrics | `/api/v1/metrics` | Prometheus scrape endpoint |
-
-## Seller Subscription Flow
-
-1. A new seller is automatically placed on the Free tier after registration.
-2. List active tiers with `GET /api/v1/subscriptions/tiers`.
-3. Start paid checkout with `POST /api/v1/subscriptions/checkout/:tierId`.
-4. Redirect the seller to the returned `authorizationUrl`.
-5. After Paystack redirects back, call `POST /api/v1/subscriptions/verify`.
-6. Paystack webhook events also keep recurring billing state in sync.
-
-Subscription checkout body:
-
-```json
-{
-  "idempotencyKey": "seller-tier-upgrade-123",
-  "callbackUrl": "http://localhost:3001/seller/subscription/callback"
-}
-```
-
-Subscription verify body:
-
-```json
-{
-  "reference": "SUB-BASIC-ABCDEFGH"
-}
-```
 
 ## Testing
 

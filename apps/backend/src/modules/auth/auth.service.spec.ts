@@ -7,7 +7,6 @@ import { UsersService } from '../users/users.service';
 import { UserRole } from '../users/enums/user-role.enum';
 import { MailService } from '../mail/mail.service';
 import { SellersService } from '../sellers/sellers.service';
-import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -55,10 +54,6 @@ describe('AuthService', () => {
     createForUser: jest.fn(),
   };
 
-  const mockSubscriptionsService = {
-    startFreeTrial: jest.fn(),
-  };
-
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -69,7 +64,6 @@ describe('AuthService', () => {
         { provide: ConfigService, useValue: mockConfigService },
         { provide: MailService, useValue: mockMailService },
         { provide: SellersService, useValue: mockSellersService },
-        { provide: SubscriptionsService, useValue: mockSubscriptionsService },
       ],
     }).compile();
 
@@ -162,9 +156,6 @@ describe('AuthService', () => {
       email: 'seller@example.com',
       storeName: 'Tola Stores',
     });
-    expect(mockSubscriptionsService.startFreeTrial).toHaveBeenCalledWith(
-      'seller-profile-1',
-    );
   });
 
   it('register() should honor an explicit seller store name', async () => {

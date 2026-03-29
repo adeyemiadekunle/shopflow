@@ -7,6 +7,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { MediaService } from '../media/media.service';
 import { UploadMediaType } from '../media/dto/media.dto';
+import { PlatformConfigKey } from '../platform-config/constants/platform-config.keys';
+import { PlatformConfigService } from '../platform-config/platform-config.service';
 import { FeedPost } from './entities/feed-post.entity';
 import { FeedLike } from './entities/feed-like.entity';
 import { FeedComment } from './entities/feed-comment.entity';
@@ -27,6 +29,7 @@ export class FeedService {
     @InjectRepository(FeedFollow)
     private readonly followRepo: Repository<FeedFollow>,
     private readonly mediaService: MediaService,
+    private readonly platformConfigService: PlatformConfigService,
   ) {}
 
   // ─── Posts ──────────────────────────────────────────────────────────────────
@@ -42,6 +45,37 @@ export class FeedService {
         url,
       })) ??
       [];
+
+    const feedEnabled = await this.platformConfigService.getBoolean(
+      PlatformConfigKey.FEATURE_FEED_ENABLED,
+      true,
+    );
+    const feedImagesEnabled = await this.platformConfigService.getBoolean(
+      PlatformConfigKey.FEATURE_MEDIA_FEED_IMAGES_ENABLED,
+      true,
+    );
+    const feedVideoEnabled = await this.platformConfigService.getBoolean(
+      PlatformConfigKey.FEATURE_MEDIA_FEED_VIDEO_ENABLED,
+      false,
+    );
+
+    if (!feedEnabled) {
+      throw new ForbiddenException('Feed posting is not enabled right now');
+    }
+
+    if (
+      media.some((item) => item.type === UploadMediaType.IMAGE) &&
+      !feedImagesEnabled
+    ) {
+      throw new ForbiddenException('Feed image uploads are not enabled right now');
+    }
+
+    if (
+      media.some((item) => item.type === UploadMediaType.VIDEO) &&
+      !feedVideoEnabled
+    ) {
+      throw new ForbiddenException('Feed video uploads are not enabled right now');
+    }
 
     for (const item of media) {
       if (!this.mediaService.isAllowedPublicUrl(item.url.trim())) {

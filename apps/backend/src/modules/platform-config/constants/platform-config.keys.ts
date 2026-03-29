@@ -22,6 +22,14 @@ export const PlatformConfigKey = {
   // ─── Support ───────────────────────────────────────────────────
   /** Support email address */
   SUPPORT_EMAIL: 'platform.support_email',
+
+  // Feature flags
+  FEATURE_FEED_ENABLED: 'features.feed.enabled',
+  FEATURE_CHAT_ENABLED: 'features.chat.enabled',
+  FEATURE_MEDIA_CATALOG_IMAGES_ENABLED: 'features.media.catalog.images.enabled',
+  FEATURE_MEDIA_CATALOG_VIDEO_ENABLED: 'features.media.catalog.video.enabled',
+  FEATURE_MEDIA_FEED_IMAGES_ENABLED: 'features.media.feed.images.enabled',
+  FEATURE_MEDIA_FEED_VIDEO_ENABLED: 'features.media.feed.video.enabled',
 } as const;
 
 export type PlatformConfigKeyType =

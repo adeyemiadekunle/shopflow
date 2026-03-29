@@ -7,6 +7,8 @@ import { ConfigService } from '@nestjs/config';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
+import { PlatformConfigKey } from '../platform-config/constants/platform-config.keys';
+import { PlatformConfigService } from '../platform-config/platform-config.service';
 import {
   CreateMediaUploadDto,
   MediaUsage,
@@ -31,7 +33,10 @@ const VIDEO_CONTENT_TYPES = new Set([
 export class MediaService {
   private readonly s3: S3Client;
 
-  constructor(private readonly config: ConfigService) {
+  constructor(
+    private readonly config: ConfigService,
+    private readonly platformConfigService: PlatformConfigService,
+  ) {
     this.s3 = new S3Client({
       region: this.config.get<string>('media.awsRegion'),
       credentials:
@@ -88,6 +93,61 @@ export class MediaService {
     return normalized;
   }
 
+  private async assertUploadFeatureEnabled(
+    usage: MediaUsage,
+    mediaType: UploadMediaType,
+  ): Promise<void> {
+    if (usage === MediaUsage.CATALOG_PRODUCT) {
+      const catalogImagesEnabled = await this.platformConfigService.getBoolean(
+        PlatformConfigKey.FEATURE_MEDIA_CATALOG_IMAGES_ENABLED,
+        true,
+      );
+      const catalogVideoEnabled = await this.platformConfigService.getBoolean(
+        PlatformConfigKey.FEATURE_MEDIA_CATALOG_VIDEO_ENABLED,
+        false,
+      );
+
+      if (mediaType === UploadMediaType.IMAGE && !catalogImagesEnabled) {
+        throw new ForbiddenException(
+          'Catalog image uploads are not enabled right now',
+        );
+      }
+
+      if (mediaType === UploadMediaType.VIDEO && !catalogVideoEnabled) {
+        throw new ForbiddenException(
+          'Catalog video uploads are not enabled right now',
+        );
+      }
+
+      return;
+    }
+
+    const feedEnabled = await this.platformConfigService.getBoolean(
+      PlatformConfigKey.FEATURE_FEED_ENABLED,
+      true,
+    );
+    const feedImagesEnabled = await this.platformConfigService.getBoolean(
+      PlatformConfigKey.FEATURE_MEDIA_FEED_IMAGES_ENABLED,
+      true,
+    );
+    const feedVideoEnabled = await this.platformConfigService.getBoolean(
+      PlatformConfigKey.FEATURE_MEDIA_FEED_VIDEO_ENABLED,
+      false,
+    );
+
+    if (!feedEnabled) {
+      throw new ForbiddenException('Feed posting is not enabled right now');
+    }
+
+    if (mediaType === UploadMediaType.IMAGE && !feedImagesEnabled) {
+      throw new ForbiddenException('Feed image uploads are not enabled right now');
+    }
+
+    if (mediaType === UploadMediaType.VIDEO && !feedVideoEnabled) {
+      throw new ForbiddenException('Feed video uploads are not enabled right now');
+    }
+  }
+
   private buildObjectKey(
     sellerProfileId: string,
     dto: CreateMediaUploadDto,
@@ -116,6 +176,7 @@ export class MediaService {
     dto: CreateMediaUploadDto,
   ) {
     this.assertSellerContext(user);
+    await this.assertUploadFeatureEnabled(dto.usage, dto.mediaType);
 
     const bucket = this.config.get<string>('media.bucket');
     const cloudfrontBaseUrl = this.config.get<string>('media.cloudfrontBaseUrl');

@@ -83,6 +83,18 @@ export class PlatformConfigService implements OnModuleInit {
     return value;
   }
 
+  async getBoolean(
+    key: PlatformConfigKeyType | string,
+    fallback: boolean,
+  ): Promise<boolean> {
+    const raw = await this.get(key);
+    if (raw === undefined) {
+      return fallback;
+    }
+
+    return raw === 'true';
+  }
+
   async getDefaultCommissionRate(): Promise<number> {
     const raw = await this.get(PlatformConfigKey.DEFAULT_COMMISSION_RATE);
     return raw !== undefined ? parseFloat(raw) : 10;
@@ -172,9 +184,6 @@ export class PlatformConfigService implements OnModuleInit {
    * Market identity (currency, country, etc.) is NOT seeded here — it comes from env vars.
    */
   private async seedDefaults(): Promise<void> {
-    const count = await this.configRepo.count();
-    if (count > 0) return;
-
     const defaults: Array<{
       key: string;
       value: string;
@@ -213,11 +222,59 @@ export class PlatformConfigService implements OnModuleInit {
         description: 'Platform support email shown to users',
         isPublic: true,
       },
+      {
+        key: PlatformConfigKey.FEATURE_FEED_ENABLED,
+        value: 'true',
+        description: 'Enable seller feed posting platform-wide',
+        isPublic: true,
+      },
+      {
+        key: PlatformConfigKey.FEATURE_CHAT_ENABLED,
+        value: 'true',
+        description: 'Enable buyer-seller chat platform-wide',
+        isPublic: true,
+      },
+      {
+        key: PlatformConfigKey.FEATURE_MEDIA_CATALOG_IMAGES_ENABLED,
+        value: 'true',
+        description: 'Enable catalog image uploads platform-wide',
+        isPublic: true,
+      },
+      {
+        key: PlatformConfigKey.FEATURE_MEDIA_CATALOG_VIDEO_ENABLED,
+        value: 'false',
+        description: 'Enable catalog video uploads platform-wide',
+        isPublic: true,
+      },
+      {
+        key: PlatformConfigKey.FEATURE_MEDIA_FEED_IMAGES_ENABLED,
+        value: 'true',
+        description: 'Enable feed image uploads platform-wide',
+        isPublic: true,
+      },
+      {
+        key: PlatformConfigKey.FEATURE_MEDIA_FEED_VIDEO_ENABLED,
+        value: 'false',
+        description: 'Enable feed video uploads platform-wide',
+        isPublic: true,
+      },
     ];
 
-    await this.configRepo.save(defaults.map((d) => this.configRepo.create(d)));
+    const existing = await this.configRepo.find({
+      select: ['key'],
+    });
+    const existingKeys = new Set(existing.map((row) => row.key));
+    const missingDefaults = defaults.filter((item) => !existingKeys.has(item.key));
+
+    if (missingDefaults.length === 0) {
+      return;
+    }
+
+    await this.configRepo.save(
+      missingDefaults.map((d) => this.configRepo.create(d)),
+    );
     this.logger.log(
-      `PlatformConfig: seeded ${defaults.length} default business-rule keys`,
+      `PlatformConfig: seeded ${missingDefaults.length} missing business-rule keys`,
     );
   }
 }

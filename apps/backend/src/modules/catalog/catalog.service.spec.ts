@@ -2,6 +2,7 @@ import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { MediaService } from '../media/media.service';
+import { PlatformConfigService } from '../platform-config/platform-config.service';
 import { SellersService } from '../sellers/sellers.service';
 import { CatalogService } from './catalog.service';
 import { Category } from './entities/category.entity';
@@ -14,6 +15,7 @@ describe('CatalogService', () => {
 
   const mockProductRepo = {
     findAndCount: jest.fn(),
+    count: jest.fn(),
     findOne: jest.fn(),
     create: jest.fn((value: Record<string, unknown>) => ({ ...value })),
     save: jest.fn(),
@@ -42,6 +44,10 @@ describe('CatalogService', () => {
 
   const mockMediaService = {
     isAllowedPublicUrl: jest.fn().mockReturnValue(true),
+  };
+
+  const mockPlatformConfigService = {
+    getBoolean: jest.fn().mockResolvedValue(true),
   };
 
   beforeEach(async () => {
@@ -74,6 +80,7 @@ describe('CatalogService', () => {
           provide: MediaService,
           useValue: mockMediaService,
         },
+        { provide: PlatformConfigService, useValue: mockPlatformConfigService },
       ],
     }).compile();
 

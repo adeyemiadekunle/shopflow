@@ -15,7 +15,6 @@
 - [Platform Config](#platform-config)
 - [Addresses](#addresses--apiv1addresses)
 - [Cart](#cart--apiv1cart)
-- [Subscription Tiers](#subscription-tiers)
 - [Testing](#testing)
 - [Docker & Infrastructure](#docker--infrastructure)
 - [CI/CD](#cicd)
@@ -29,7 +28,7 @@
 ┌─────────────────────────────────────────────────────┐
 │                  NestJS API (port 3000)              │
 │  auth · users · sellers · catalog · orders           │
-│  payments · ledger · subscriptions · platform-config │
+│  payments · ledger · platform-config                 │
 │  feed · chat (WebSocket + REST)                       │
 ├─────────────────────────────────────────────────────┤
 │  PostgreSQL (TypeORM)    │  Redis (BullMQ / cache)   │
@@ -42,7 +41,7 @@ Key design principles:
 - **Immutable ledger** — double-entry, atomic transactions, pessimistic write locks
 - **14-state order machine** — guarded transitions, full audit trail
 - **Admin-configurable platform** — currency, country, commission, return policy all set via API, never hardcoded
-- **Subscription-gated features** — seller capabilities are tied to subscription tier, not server constants
+- **Ship-dark features** — features can be shipped in code and enabled later from admin platform config
 
 ---
 
@@ -514,31 +513,6 @@ Buyer↔seller 1:1 real-time messaging. One conversation per buyer-seller pair.
 
 JWT auth via `auth.token` in the Socket.IO handshake.
 
-### Subscriptions — `/api/v1/subscriptions`
-
-| Method | Route | Auth | Description |
-|---|---|---|---|
-| GET | `/tiers` | Public | Active tiers (pricing page) |
-| GET | `/me` | Seller | Current seller subscription and resolved feature flags |
-| POST | `/checkout/:tierId` | Seller | Initialize Paystack checkout for a seller tier |
-| POST | `/verify` | Seller | Verify seller subscription payment by reference |
-| POST | `/cancel` | Seller | Disable recurring billing for the current seller subscription |
-| GET | `/admin/tiers` | Admin | All tiers including inactive |
-| PUT | `/admin/tiers` | Admin | Create or replace a tier |
-| PATCH | `/admin/tiers/:id` | Admin | Update price, currency, features |
-| POST | `/admin/tiers/:id/sync-plan` | Admin | Create and store the Paystack plan code for a paid tier |
-| POST | `/admin/tiers/seed` | Admin | Bootstrap default tiers |
-
-Seller subscription flow:
-
-1. New seller registration automatically starts on the Free tier.
-2. Frontend lists tiers from `GET /api/v1/subscriptions/tiers`.
-3. Seller starts paid checkout with `POST /api/v1/subscriptions/checkout/:tierId`.
-4. Backend returns a Paystack `authorizationUrl`.
-5. Frontend redirects the seller to Paystack Checkout.
-6. After redirect back, frontend calls `POST /api/v1/subscriptions/verify`.
-7. Recurring lifecycle updates are also processed from Paystack webhooks (`subscription.create`, `charge.success`, `invoice.update`, `invoice.payment_failed`, `subscription.disable`).
-
 ### Health — `/health`
 
 Database and memory health checks via `@nestjs/terminus`.
@@ -608,21 +582,22 @@ Safe to change at any time — they apply to future records only.
 | `platform.min_payout_amount` | `1000` | Minimum payout amount |
 | `platform.supported_payment_gateways` | `paystack` | Active payment gateways |
 | `platform.support_email` | `support@rands.ng` | Support contact |
+| `features.feed.enabled` | `true` | Platform-wide seller feed posting toggle |
+| `features.chat.enabled` | `true` | Platform-wide buyer-seller chat toggle |
+| `features.media.catalog.images.enabled` | `true` | Platform-wide catalog image upload toggle |
+| `features.media.catalog.video.enabled` | `false` | Platform-wide catalog video upload toggle |
+| `features.media.feed.images.enabled` | `true` | Platform-wide feed image upload toggle |
+| `features.media.feed.video.enabled` | `false` | Platform-wide feed video upload toggle |
 
 ---
 
-## Subscription Tiers
+## Feature Rollout
 
-Tiers gate seller features. All values are admin-configurable:
+Platform rollout is admin-controlled:
 
-| Tier | Default Price | Key features |
-|---|---|---|
-| **Free** | 0 | 10 products, 3 media/product, 2 payouts/month |
-| **Basic** | 5,000 | 100 products, analytics, discount campaigns, 8 payouts/month |
-| **Pro** | 15,000 | Unlimited products, priority listing, unlimited payouts |
-| **Enterprise** | 50,000 | Custom domain, account manager, lowest commission |
-
-Feature flags per tier (all configurable): `maxProducts`, `maxMediaPerProduct`, `analyticsEnabled`, `priorityListing`, `discountCampaignsEnabled`, `monthlyPayoutRequests`, `customDomainEnabled`, `commissionRatePercent`.
+- features can be shipped in code and stay dark until enabled from platform config
+- current platform-gated actions using this model: feed posting, chat access, catalog image uploads, catalog video uploads, feed image uploads, and feed video uploads
+- seller monetization now defaults to commission-driven growth rather than subscription-gated access
 
 ---
 
@@ -716,7 +691,6 @@ apps/backend/src/
 │   ├── payments/         # Paystack integration + webhooks
 │   ├── platform-config/  # Admin-managed platform settings
 │   ├── sellers/          # Seller profiles, KYC, bank accounts
-│   ├── subscriptions/    # Seller subscription tiers + features
 │   └── users/            # User accounts + roles
 └── main.ts               # App entrypoint (Swagger setup, port 3000)
 

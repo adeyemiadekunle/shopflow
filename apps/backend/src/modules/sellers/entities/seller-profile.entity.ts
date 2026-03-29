@@ -55,7 +55,7 @@ export class SellerProfile {
   @Column({ name: 'kyc_verified', default: false })
   kycVerified!: boolean;
 
-  // Commission rate is NOT stored here — managed by platform PolicyRule / SubscriptionTier.
+  // Commission rate is not stored here and stays under platform policy rules.
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
