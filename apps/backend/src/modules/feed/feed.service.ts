@@ -5,10 +5,13 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
+import { MediaService } from '../media/media.service';
+import { UploadMediaType } from '../media/dto/media.dto';
 import { FeedPost } from './entities/feed-post.entity';
 import { FeedLike } from './entities/feed-like.entity';
 import { FeedComment } from './entities/feed-comment.entity';
 import { FeedFollow } from './entities/feed-follow.entity';
+import { FeedPostMedia } from './entities/feed-post.entity';
 import { FeedPostStatus } from './enums/feed-post-status.enum';
 import { CreateFeedPostDto, CreateCommentDto } from './dto/feed.dto';
 
@@ -23,6 +26,7 @@ export class FeedService {
     private readonly commentRepo: Repository<FeedComment>,
     @InjectRepository(FeedFollow)
     private readonly followRepo: Repository<FeedFollow>,
+    private readonly mediaService: MediaService,
   ) {}
 
   // ─── Posts ──────────────────────────────────────────────────────────────────
@@ -31,11 +35,28 @@ export class FeedService {
     sellerProfileId: string,
     dto: CreateFeedPostDto,
   ): Promise<FeedPost> {
+    const media: FeedPostMedia[] =
+      dto.media ??
+      dto.mediaUrls?.map((url) => ({
+        type: UploadMediaType.IMAGE,
+        url,
+      })) ??
+      [];
+
+    for (const item of media) {
+      if (!this.mediaService.isAllowedPublicUrl(item.url.trim())) {
+        throw new ForbiddenException(
+          'Feed media must use the configured CloudFront media base URL',
+        );
+      }
+    }
+
     return this.postRepo.save(
       this.postRepo.create({
         sellerProfileId,
         content: dto.content,
-        mediaUrls: dto.mediaUrls ?? [],
+        mediaUrls: media.map((item) => item.url),
+        media,
         productId: dto.productId,
       }),
     );

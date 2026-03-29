@@ -43,6 +43,18 @@ export default () => ({
     frontendBaseUrl:
       process.env['FRONTEND_BASE_URL'] ?? 'http://localhost:3001',
   },
+  media: {
+    awsRegion: process.env['AWS_REGION'] ?? 'eu-west-2',
+    bucket: process.env['AWS_S3_BUCKET'] ?? '',
+    cloudfrontBaseUrl: process.env['AWS_CLOUDFRONT_BASE_URL'] ?? '',
+    accessKeyId: process.env['AWS_ACCESS_KEY_ID'] ?? '',
+    secretAccessKey: process.env['AWS_SECRET_ACCESS_KEY'] ?? '',
+    presignExpiresInSeconds: parseInt(
+      process.env['MEDIA_PRESIGN_EXPIRES_IN_SECONDS'] ?? '900',
+      10,
+    ),
+    allowVideoUploads: process.env['MEDIA_ALLOW_VIDEO_UPLOADS'] === 'true',
+  },
   paystack: {
     secretKey: process.env['PAYSTACK_SECRET_KEY'] ?? '',
     publicKey: process.env['PAYSTACK_PUBLIC_KEY'] ?? '',

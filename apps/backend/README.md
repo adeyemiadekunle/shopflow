@@ -52,6 +52,12 @@ Copy `.env.example` to `.env` and fill in:
 | `APP_BASE_URL` | Backend base URL |
 | `MAIL_FROM` / `SMTP_*` | SMTP sender and transport settings |
 | `FRONTEND_BASE_URL` | Frontend URL used in email links |
+| `AWS_REGION` | AWS region for S3 uploads |
+| `AWS_S3_BUCKET` | S3 bucket for catalog and feed uploads |
+| `AWS_CLOUDFRONT_BASE_URL` | CloudFront base URL for public media |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | AWS credentials used to generate presigned upload URLs |
+| `MEDIA_PRESIGN_EXPIRES_IN_SECONDS` | Presigned upload URL lifetime |
+| `MEDIA_ALLOW_VIDEO_UPLOADS` | Enable video uploads after the image-first rollout is stable |
 | `PAYSTACK_SECRET_KEY` | Paystack API secret |
 | `PAYSTACK_WEBHOOK_SECRET` | Webhook HMAC secret |
 | `PLATFORM_CURRENCY` | ISO 4217 code for this deployment (e.g. `NGN`) |
@@ -69,6 +75,7 @@ Copy `.env.example` to `.env` and fill in:
 | users | `/users` | User accounts, roles |
 | sellers | `/sellers` | Profiles, KYC (NIN/BVN), bank accounts |
 | catalog | `/catalog` | Products, variants, media, categories, discounts |
+| media | `/media` | Presigned S3 upload URLs for seller catalog/feed media with CloudFront delivery |
 | orders | `/orders` | Buyer order creation, seller quoting, delivery progression, disputes, and scoped order access |
 | payments | `/payments` | Paystack Checkout init, verify, webhook handling, and admin reconciliation reporting |
 | payouts | `/payouts` | Admin-managed seller payout requests, approvals, sends, and payout summaries |
@@ -162,6 +169,14 @@ Important frontend rules:
 - Treat the webhook-driven backend update as the final payment truth; the verify endpoint is mainly for immediate UI refresh after Paystack redirects back.
 - Order funds stay in `seller_pending` after payment and only move to `seller_available` after the return-policy hold window expires without an open dispute.
 - Buyer-favour dispute resolution now puts the order into `refund_pending` until Paystack confirms the refund is processed.
+
+Recommended media upload flow:
+
+1. Seller requests `POST /api/v1/media/upload-url`.
+2. Frontend uploads the file directly to the returned `uploadUrl` with the returned headers.
+3. Frontend sends the resulting CloudFront `publicUrl` and `objectKey` into catalog or feed payloads.
+4. Active products must include at least one image.
+5. Video is modelled, but the default rollout is image-first and `MEDIA_ALLOW_VIDEO_UPLOADS=false`.
 
 ## Admin Payout Flow
 

@@ -6,10 +6,11 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { MediaService } from '../media/media.service';
 import { SellersService } from '../sellers/sellers.service';
 import { CreateProductDto, UpdateProductDto } from './dto/manage-product.dto';
 import { Category } from './entities/category.entity';
-import { ProductMedia } from './entities/product-media.entity';
+import { MediaType, ProductMedia } from './entities/product-media.entity';
 import { ProductVariant } from './entities/product-variant.entity';
 import {
   DiscountType,
@@ -29,6 +30,7 @@ export class CatalogService {
     @InjectRepository(ProductMedia)
     private readonly productMediaRepo: Repository<ProductMedia>,
     private readonly sellersService: SellersService,
+    private readonly mediaService: MediaService,
   ) {}
 
   findProducts(page = 1, limit = 20): Promise<[Product[], number]> {
@@ -205,6 +207,42 @@ export class CatalogService {
     );
   }
 
+  private validateProductMedia(
+    media?: Array<{
+      type?: MediaType;
+      url: string;
+      isPrimary?: boolean;
+    }>,
+    nextStatus?: ProductStatus,
+  ): void {
+    if (!media || media.length === 0) {
+      if (nextStatus === ProductStatus.ACTIVE) {
+        throw new BadRequestException(
+          'Active products must include at least one image',
+        );
+      }
+      return;
+    }
+
+    const imageCount = media.filter(
+      (item) => (item.type ?? MediaType.IMAGE) === MediaType.IMAGE,
+    ).length;
+
+    if (nextStatus === ProductStatus.ACTIVE && imageCount === 0) {
+      throw new BadRequestException(
+        'Active products must include at least one image',
+      );
+    }
+
+    for (const item of media) {
+      if (!this.mediaService.isAllowedPublicUrl(item.url.trim())) {
+        throw new BadRequestException(
+          'Product media must use the configured CloudFront media base URL',
+        );
+      }
+    }
+  }
+
   private async getOwnedProductOrThrow(
     userId: string,
     productId: string,
@@ -235,6 +273,7 @@ export class CatalogService {
     const seller = await this.sellersService.assertCanManageProducts(userId);
     await this.ensureCategoryExists(dto.categoryId);
     this.validateDiscount(dto);
+    this.validateProductMedia(dto.media, dto.status ?? ProductStatus.DRAFT);
 
     const product = this.productRepo.create({
       sellerProfileId: seller.id,
@@ -307,6 +346,10 @@ export class CatalogService {
       discountStartsAt: discountStartsAt?.toISOString(),
       discountEndsAt: discountEndsAt?.toISOString(),
     });
+    this.validateProductMedia(
+      dto.media === undefined ? product.media : dto.media,
+      dto.status ?? product.status,
+    );
 
     if (dto.variants !== undefined) {
       await this.productVariantRepo.delete({ productId });

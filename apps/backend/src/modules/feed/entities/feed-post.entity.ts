@@ -10,8 +10,19 @@ import {
 } from 'typeorm';
 import { SellerProfile } from '../../sellers/entities/seller-profile.entity';
 import { FeedPostStatus } from '../enums/feed-post-status.enum';
+import { UploadMediaType } from '../../media/dto/media.dto';
 import type { FeedLike } from './feed-like.entity';
 import type { FeedComment } from './feed-comment.entity';
+
+export type FeedPostMedia = {
+  type: UploadMediaType;
+  url: string;
+  cdnKey?: string;
+  thumbnailUrl?: string;
+  width?: number;
+  height?: number;
+  durationSeconds?: number;
+};
 
 @Entity('feed_posts')
 export class FeedPost {
@@ -30,6 +41,9 @@ export class FeedPost {
 
   @Column({ name: 'media_urls', type: 'text', array: true, default: '{}' })
   mediaUrls!: string[];
+
+  @Column({ name: 'media', type: 'jsonb', nullable: true })
+  media?: FeedPostMedia[];
 
   /** Optional product tag — links post to a catalog product */
   @Column({ name: 'product_id', nullable: true })
