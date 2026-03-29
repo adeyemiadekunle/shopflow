@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { SellerProfile } from './entities/seller-profile.entity';
 import { SellerStatus } from './enums/seller-status.enum';
 import { UpdateSellerProfileDto } from './dto/update-seller-profile.dto';
@@ -14,6 +14,20 @@ import { BankAccount } from './entities/bank-account.entity';
 import { UpsertSellerKycDto } from './dto/upsert-seller-kyc.dto';
 import { UpsertBankAccountDto } from './dto/upsert-bank-account.dto';
 import { PaystackService } from '../payments/paystack.service';
+import { Order } from '../orders/entities/order.entity';
+import { OrderStatus } from '../orders/enums/order-status.enum';
+import { Payout, PayoutStatus } from '../payouts/entities/payout.entity';
+import { Refund, RefundStatus } from '../refunds/entities/refund.entity';
+import { LedgerAccount } from '../ledger/entities/ledger-account.entity';
+import { LedgerAccountType } from '../ledger/enums/ledger.enum';
+
+type SellerAnalyticsTopProduct = {
+  productId: string;
+  title: string;
+  quantitySold: number;
+  revenue: number;
+  orderCount: number;
+};
 
 @Injectable()
 export class SellersService {
@@ -24,8 +38,79 @@ export class SellersService {
     private readonly sellerKycRepo: Repository<SellerKyc>,
     @InjectRepository(BankAccount)
     private readonly bankAccountRepo: Repository<BankAccount>,
+    @InjectRepository(Order)
+    private readonly orderRepo: Repository<Order>,
+    @InjectRepository(Payout)
+    private readonly payoutRepo: Repository<Payout>,
+    @InjectRepository(Refund)
+    private readonly refundRepo: Repository<Refund>,
+    @InjectRepository(LedgerAccount)
+    private readonly ledgerAccountRepo: Repository<LedgerAccount>,
     private readonly paystackService: PaystackService,
   ) {}
+
+  private readonly sellerRevenueStatuses = new Set<OrderStatus>([
+    OrderStatus.PAID,
+    OrderStatus.SELLER_PREPARING,
+    OrderStatus.SHIPPED,
+    OrderStatus.DELIVERED_PENDING_CONFIRMATION,
+    OrderStatus.COMPLETED,
+    OrderStatus.DISPUTE_OPEN,
+    OrderStatus.REFUND_PENDING,
+    OrderStatus.REFUNDED,
+  ]);
+
+  private readonly sellerPaidStatuses = new Set<OrderStatus>([
+    OrderStatus.PAID,
+    OrderStatus.SELLER_PREPARING,
+    OrderStatus.SHIPPED,
+    OrderStatus.DELIVERED_PENDING_CONFIRMATION,
+    OrderStatus.COMPLETED,
+    OrderStatus.DISPUTE_OPEN,
+    OrderStatus.REFUND_PENDING,
+  ]);
+
+  private sumDecimal(values: Array<number | string | null | undefined>): number {
+    return values.reduce<number>(
+      (total, value) => total + Number(value ?? 0),
+      0,
+    );
+  }
+
+  private buildTopProducts(orders: Order[]): SellerAnalyticsTopProduct[] {
+    const byProduct = new Map<string, SellerAnalyticsTopProduct>();
+
+    for (const order of orders) {
+      if (!this.sellerRevenueStatuses.has(order.status)) {
+        continue;
+      }
+
+      for (const item of order.items ?? []) {
+        const snapshot = item.productSnapshot ?? {};
+        const title =
+          typeof snapshot['title'] === 'string'
+            ? snapshot['title']
+            : 'Product';
+        const current = byProduct.get(item.productId) ?? {
+          productId: item.productId,
+          title,
+          quantitySold: 0,
+          revenue: 0,
+          orderCount: 0,
+        };
+
+        current.quantitySold += Number(item.quantity ?? 0);
+        current.revenue += Number(item.lineTotal ?? 0);
+        current.orderCount += 1;
+
+        byProduct.set(item.productId, current);
+      }
+    }
+
+    return Array.from(byProduct.values())
+      .sort((left, right) => right.revenue - left.revenue)
+      .slice(0, 5);
+  }
 
   private slugify(value: string): string {
     return value
@@ -167,6 +252,132 @@ export class SellersService {
       profile: seller,
       kyc,
       bankAccount,
+    };
+  }
+
+  async getAnalytics(userId: string) {
+    const seller = await this.getByUserIdOrThrow(userId);
+
+    const [orders, payouts, refunds, ledgerAccounts] = await Promise.all([
+      this.orderRepo.find({
+        where: { sellerProfileId: seller.id },
+        relations: ['items'],
+        order: { createdAt: 'DESC' },
+      }),
+      this.payoutRepo.find({
+        where: { sellerProfileId: seller.id },
+        order: { createdAt: 'DESC' },
+      }),
+      this.refundRepo.find({
+        relations: ['order'],
+        order: { createdAt: 'DESC' },
+      }),
+      this.ledgerAccountRepo.find({
+        where: {
+          ownerId: seller.id,
+          type: In([
+            LedgerAccountType.SELLER_PENDING,
+            LedgerAccountType.SELLER_AVAILABLE,
+          ]),
+        },
+      }),
+    ]);
+
+    const sellerRefunds = refunds.filter(
+      (refund) => refund.order?.sellerProfileId === seller.id,
+    );
+    const statusBreakdown = Object.values(OrderStatus).reduce(
+      (accumulator, status) => {
+        accumulator[status] = 0;
+        return accumulator;
+      },
+      {} as Record<OrderStatus, number>,
+    );
+
+    for (const order of orders) {
+      statusBreakdown[order.status] += 1;
+    }
+
+    const pendingAccount = ledgerAccounts.find(
+      (account) => account.type === LedgerAccountType.SELLER_PENDING,
+    );
+    const availableAccount = ledgerAccounts.find(
+      (account) => account.type === LedgerAccountType.SELLER_AVAILABLE,
+    );
+    const paidOrders = orders.filter((order) =>
+      this.sellerPaidStatuses.has(order.status),
+    );
+    const grossSales = this.sumDecimal(
+      orders
+        .filter((order) => this.sellerRevenueStatuses.has(order.status))
+        .map((order) => order.totalAmount),
+    );
+    const totalRefunds = this.sumDecimal(
+      sellerRefunds
+        .filter((refund) => refund.status === RefundStatus.PROCESSED)
+        .map((refund) => refund.amount),
+    );
+    const totalPayouts = this.sumDecimal(
+      payouts
+        .filter((payout) => payout.status === PayoutStatus.SUCCEEDED)
+        .map((payout) => payout.amount),
+    );
+    const recentOrders = orders.slice(0, 5).map((order) => ({
+      id: order.id,
+      orderReference: order.orderReference,
+      status: order.status,
+      totalAmount: Number(order.totalAmount),
+      currency: order.currency,
+      createdAt: order.createdAt,
+      paidAt: order.paidAt,
+      deliveredAt: order.deliveredAt,
+    }));
+    const recentPayouts = payouts.slice(0, 5).map((payout) => ({
+      id: payout.id,
+      reference: payout.reference,
+      status: payout.status,
+      amount: Number(payout.amount),
+      currency: payout.currency,
+      createdAt: payout.createdAt,
+      processedAt: payout.processedAt,
+    }));
+    const recentRefunds = sellerRefunds.slice(0, 5).map((refund) => ({
+      id: refund.id,
+      orderId: refund.orderId,
+      status: refund.status,
+      amount: Number(refund.amount),
+      currency: refund.currency,
+      createdAt: refund.createdAt,
+      processedAt: refund.processedAt,
+    }));
+
+    return {
+      sellerProfileId: seller.id,
+      storeName: seller.storeName,
+      storeSlug: seller.storeSlug,
+      currency:
+        orders[0]?.currency ??
+        payouts[0]?.currency ??
+        sellerRefunds[0]?.currency ??
+        'NGN',
+      overview: {
+        totalOrders: orders.length,
+        paidOrders: paidOrders.length,
+        completedOrders: statusBreakdown[OrderStatus.COMPLETED],
+        cancelledOrders: statusBreakdown[OrderStatus.CANCELLED],
+        openDisputes: statusBreakdown[OrderStatus.DISPUTE_OPEN],
+        refundedOrders: statusBreakdown[OrderStatus.REFUNDED],
+        grossSales,
+        totalRefunds,
+        totalPayouts,
+        pendingFunds: Number(pendingAccount?.balance ?? 0),
+        availableFunds: Number(availableAccount?.balance ?? 0),
+      },
+      orderStatusBreakdown: statusBreakdown,
+      topProducts: this.buildTopProducts(orders),
+      recentOrders,
+      recentPayouts,
+      recentRefunds,
     };
   }
 
