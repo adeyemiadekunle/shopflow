@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { Order } from '../../orders/entities/order.entity';
 import { User } from '../../users/entities/user.entity';
+import { PaymentProvider } from '../enums/payment-provider.enum';
 
 export enum PaymentIntentStatus {
   PENDING = 'pending',
@@ -39,6 +40,16 @@ export class PaymentIntent {
 
   @Column({ name: 'paystack_reference', unique: true, length: 100 })
   paystackReference!: string;
+
+  @Column({
+    type: 'enum',
+    enum: PaymentProvider,
+    default: PaymentProvider.PAYSTACK,
+  })
+  provider!: PaymentProvider;
+
+  @Column({ name: 'provider_payment_reference', length: 100, nullable: true })
+  providerPaymentReference?: string;
 
   @Column({ name: 'idempotency_key', unique: true, length: 200 })
   idempotencyKey!: string;

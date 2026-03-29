@@ -115,6 +115,7 @@ describe('OrdersService', () => {
 
   const mockPlatformConfigService = {
     getReturnPolicyDays: jest.fn().mockResolvedValue(7),
+    getDefaultCommissionRate: jest.fn().mockResolvedValue(10),
   };
 
   const mockAddressesService = {
@@ -682,6 +683,57 @@ describe('OrdersService', () => {
       }),
     );
     expect(order.status).toBe(OrderStatus.COMPLETED);
+  });
+
+  it('resolveDispute() should split seller release into seller net and platform commission', async () => {
+    mockDisputeRepo.findOne
+      .mockResolvedValueOnce({
+        id: 'dispute-commission',
+        orderId: 'order-1',
+        status: DisputeStatus.OPEN,
+      })
+      .mockResolvedValueOnce(null);
+    mockOrderRepo.findOne.mockReset();
+    mockOrderRepo.findOne
+      .mockResolvedValueOnce({
+        ...mockOrder,
+        status: OrderStatus.DISPUTE_OPEN,
+        platformFee: 1050,
+      })
+      .mockResolvedValueOnce({
+        ...mockOrder,
+        status: OrderStatus.DISPUTE_OPEN,
+        platformFee: 1050,
+      })
+      .mockResolvedValueOnce({
+        ...mockOrder,
+        status: OrderStatus.COMPLETED,
+        platformFee: 1050,
+      });
+
+    await service.resolveDispute('dispute-commission', 'admin-1', {
+      outcome: 'seller' as const,
+      resolutionNotes: 'Release seller net proceeds after deducting commission.',
+    });
+
+    expect(mockLedgerService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountType: 'seller_pending',
+        amount: -10500,
+      }),
+    );
+    expect(mockLedgerService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountType: 'seller_available',
+        amount: 9450,
+      }),
+    );
+    expect(mockLedgerService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountType: 'platform_revenue',
+        amount: 1050,
+      }),
+    );
   });
 
   it('resolveDispute() should initiate a refund-pending flow for buyer-favour outcomes', async () => {

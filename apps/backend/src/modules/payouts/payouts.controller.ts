@@ -7,6 +7,7 @@ import { UserRole } from '../users/enums/user-role.enum';
 import {
   ApprovePayoutDto,
   CreatePayoutRequestDto,
+  SendBulkPayoutsDto,
   SendPayoutDto,
 } from './dto/admin-payout.dto';
 import { PayoutStatus } from './entities/payout.entity';
@@ -65,7 +66,7 @@ export class PayoutsController {
   @Post('admin/:id/send')
   @Roles(UserRole.ADMIN)
   @ApiOperation({
-    summary: 'Send an approved payout through Paystack Transfers',
+    summary: 'Send an approved payout through the configured payout provider',
   })
   sendPayout(
     @CurrentUser() user: AuthenticatedUser,
@@ -73,5 +74,17 @@ export class PayoutsController {
     @Body() dto: SendPayoutDto,
   ) {
     return this.payoutsService.sendPayout(id, user.id, dto);
+  }
+
+  @Post('admin/send-bulk')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Send multiple approved payouts as a bulk payout batch through Monnify',
+  })
+  sendBulkPayouts(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: SendBulkPayoutsDto,
+  ) {
+    return this.payoutsService.sendBulkPayouts(user.id, dto);
   }
 }

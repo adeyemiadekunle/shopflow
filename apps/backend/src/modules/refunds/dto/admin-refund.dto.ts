@@ -33,6 +33,18 @@ export class CreateRefundDto {
   @IsString()
   @MaxLength(1000)
   customerNote?: string;
+
+  @ApiPropertyOptional({ example: '1234567890' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  destinationAccountNumber?: string;
+
+  @ApiPropertyOptional({ example: '050' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  destinationBankCode?: string;
 }
 
 export class RetryRefundWithBuyerDetailsDto {

@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { LedgerService } from '../ledger/ledger.service';
 import { PlatformConfigService } from '../platform-config/platform-config.service';
+import { MonnifyService } from '../payments/monnify.service';
 import { PaystackService } from '../payments/paystack.service';
 import { BankAccount } from '../sellers/entities/bank-account.entity';
 import { SellerProfile } from '../sellers/entities/seller-profile.entity';
@@ -48,11 +49,17 @@ describe('PayoutsService', () => {
   const mockPlatformConfigService = {
     getMinPayoutAmount: jest.fn().mockResolvedValue(1000),
     getCurrency: jest.fn().mockReturnValue('NGN'),
+    getDefaultPayoutProvider: jest.fn().mockResolvedValue('paystack'),
   };
 
   const mockPaystackService = {
     createTransferRecipient: jest.fn(),
     initiateTransfer: jest.fn(),
+  };
+
+  const mockMonnifyService = {
+    initiateSingleTransfer: jest.fn(),
+    initiateBulkTransfer: jest.fn(),
   };
 
   const seller: SellerProfile = {
@@ -106,6 +113,7 @@ describe('PayoutsService', () => {
           useValue: mockPlatformConfigService,
         },
         { provide: PaystackService, useValue: mockPaystackService },
+        { provide: MonnifyService, useValue: mockMonnifyService },
       ],
     }).compile();
 
@@ -210,6 +218,94 @@ describe('PayoutsService', () => {
     expect(payout.status).toBe(PayoutStatus.PROCESSING);
   });
 
+  it('sendPayout() should use Monnify when the payout provider is monnify', async () => {
+    mockPayoutRepo.findOne.mockResolvedValue({
+      id: 'payout-1',
+      sellerProfileId: 'seller-1',
+      bankAccountId: 'bank-1',
+      reference: 'PAYOUT-REF-1',
+      amount: 12000,
+      currency: 'NGN',
+      provider: 'monnify',
+      status: PayoutStatus.APPROVED,
+      sellerProfile: seller,
+      bankAccount,
+    } satisfies Partial<Payout>);
+    mockBankAccountRepo.findOne.mockResolvedValue(bankAccount);
+    mockMonnifyService.initiateSingleTransfer.mockResolvedValue({
+      reference: 'PAYOUT-REF-1',
+      transactionReference: 'MNF-TRF-1',
+      status: 'PENDING',
+    });
+
+    const payout = await service.sendPayout('payout-1', 'admin-1', {
+      reason: 'Bulk seller payout',
+    });
+
+    expect(mockMonnifyService.initiateSingleTransfer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        amount: 12000,
+        reference: 'PAYOUT-REF-1',
+        destinationBankCode: '058',
+        destinationAccountNumber: '0123456789',
+      }),
+    );
+    expect(mockPaystackService.createTransferRecipient).not.toHaveBeenCalled();
+    expect(payout.status).toBe(PayoutStatus.PROCESSING);
+    expect(payout.providerTransferReference).toBe('PAYOUT-REF-1');
+    expect(payout.providerTransferId).toBe('MNF-TRF-1');
+  });
+
+  it('sendBulkPayouts() should send approved Monnify payouts in one batch', async () => {
+    mockPayoutRepo.find.mockResolvedValue([
+      {
+        id: 'payout-1',
+        sellerProfileId: 'seller-1',
+        bankAccountId: 'bank-1',
+        reference: 'PAYOUT-REF-1',
+        amount: 12000,
+        currency: 'NGN',
+        provider: 'monnify',
+        status: PayoutStatus.APPROVED,
+        sellerProfile: seller,
+        bankAccount,
+      },
+      {
+        id: 'payout-2',
+        sellerProfileId: 'seller-1',
+        bankAccountId: 'bank-1',
+        reference: 'PAYOUT-REF-2',
+        amount: 8000,
+        currency: 'NGN',
+        provider: 'monnify',
+        status: PayoutStatus.APPROVED,
+        sellerProfile: seller,
+        bankAccount,
+      },
+    ]);
+    mockMonnifyService.initiateBulkTransfer.mockResolvedValue({
+      batchReference: 'BATCH-1',
+      totalAmount: 20000,
+      batchStatus: 'PENDING',
+    });
+
+    const result = await service.sendBulkPayouts('admin-1', {
+      payoutIds: ['payout-1', 'payout-2'],
+      narration: 'Weekly seller batch',
+    });
+
+    expect(mockMonnifyService.initiateBulkTransfer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        transactionList: [
+          expect.objectContaining({ reference: 'PAYOUT-REF-1', amount: 12000 }),
+          expect.objectContaining({ reference: 'PAYOUT-REF-2', amount: 8000 }),
+        ],
+      }),
+    );
+    expect(result.batchReference).toBe('BATCH-1');
+    expect(result.payoutCount).toBe(2);
+  });
+
   it('processPaystackWebhook() should settle a successful payout only once', async () => {
     mockPayoutRepo.findOne.mockResolvedValue({
       id: 'payout-1',
@@ -235,6 +331,40 @@ describe('PayoutsService', () => {
     expect(mockPayoutRepo.save).toHaveBeenCalledWith(
       expect.objectContaining({
         status: PayoutStatus.SUCCEEDED,
+      }),
+    );
+  });
+
+  it('processMonnifyWebhook() should settle a successful Monnify payout', async () => {
+    mockPayoutRepo.findOne.mockResolvedValue({
+      id: 'payout-1',
+      sellerProfileId: 'seller-1',
+      bankAccountId: 'bank-1',
+      reference: 'PAYOUT-REF-1',
+      amount: 12000,
+      currency: 'NGN',
+      provider: 'monnify',
+      status: PayoutStatus.PROCESSING,
+      bankAccount,
+    } satisfies Partial<Payout>);
+
+    const handled = await service.processMonnifyWebhook(
+      'SUCCESSFUL_DISBURSEMENT',
+      {
+        eventType: 'SUCCESSFUL_DISBURSEMENT',
+        eventData: {
+          reference: 'PAYOUT-REF-1',
+          transactionReference: 'MNF-TRF-1',
+        },
+      },
+    );
+
+    expect(handled).toBe(true);
+    expect(mockLedgerService.record).toHaveBeenCalledTimes(1);
+    expect(mockPayoutRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: PayoutStatus.SUCCEEDED,
+        providerTransferId: 'MNF-TRF-1',
       }),
     );
   });

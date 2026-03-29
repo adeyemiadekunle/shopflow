@@ -28,6 +28,7 @@ import { UsersService } from '../users/users.service';
 import { UserRole } from '../users/enums/user-role.enum';
 import { PAYMENTS_QUEUE, PaymentJobName } from '../queue/queue.constants';
 import { PayoutsService } from '../payouts/payouts.service';
+import { PlatformConfigService } from '../platform-config/platform-config.service';
 import { RefundsService } from '../refunds/refunds.service';
 import {
   InitializeCheckoutDto,
@@ -54,6 +55,11 @@ import {
   PaystackService,
   PaystackVerifyResponse,
 } from './paystack.service';
+import {
+  MonnifyService,
+  MonnifyTransactionStatusResponse,
+} from './monnify.service';
+import { PaymentProvider } from './enums/payment-provider.enum';
 import * as crypto from 'crypto';
 
 type QueueReconciliationTrigger = 'manual' | 'scheduled';
@@ -97,8 +103,10 @@ export class PaymentsService {
     private readonly paymentsQueue: Queue,
     private readonly config: ConfigService,
     private readonly paystackService: PaystackService,
+    private readonly monnifyService: MonnifyService,
     private readonly usersService: UsersService,
     private readonly ledgerService: LedgerService,
+    private readonly platformConfigService: PlatformConfigService,
     @Inject(forwardRef(() => PayoutsService))
     private readonly payoutsService: PayoutsService,
     @Inject(forwardRef(() => RefundsService))
@@ -184,6 +192,26 @@ export class PaymentsService {
     return crypto.randomUUID();
   }
 
+  private calculateCommissionAmount(
+    grossAmount: number,
+    commissionRatePercent: number,
+  ): number {
+    if (!Number.isFinite(grossAmount) || grossAmount <= 0) {
+      return 0;
+    }
+
+    if (
+      !Number.isFinite(commissionRatePercent) ||
+      Number.isNaN(commissionRatePercent) ||
+      commissionRatePercent <= 0
+    ) {
+      return 0;
+    }
+
+    const cappedRate = Math.min(Math.max(commissionRatePercent, 0), 100);
+    return Number(((grossAmount * cappedRate) / 100).toFixed(2));
+  }
+
   private normalizeChannels(
     channels?: PaystackCheckoutChannel[],
   ): PaystackCheckoutChannel[] | undefined {
@@ -200,6 +228,72 @@ export class PaymentsService {
     }
 
     return Math.min(Math.floor(limit), 100);
+  }
+
+  private mapMonnifyStatusToVerifyStatus(status?: string): string {
+    switch ((status ?? '').toUpperCase()) {
+      case 'PAID':
+      case 'OVERPAID':
+        return 'success';
+      case 'FAILED':
+      case 'EXPIRED':
+      case 'CANCELLED':
+        return 'failed';
+      default:
+        return 'pending';
+    }
+  }
+
+  private toPaystackLikeVerifyResponse(
+    monnify: MonnifyTransactionStatusResponse,
+  ): PaystackVerifyResponse {
+    const amountMajor = Number.parseFloat(
+      monnify.totalPayable ?? monnify.amountPaid ?? '0',
+    );
+
+    return {
+      status: this.mapMonnifyStatusToVerifyStatus(monnify.paymentStatus),
+      reference: monnify.transactionReference,
+      amount: Math.round(amountMajor * 100),
+      currency: monnify.currencyCode ?? 'NGN',
+      paid_at: monnify.paidOn ?? new Date().toISOString(),
+      channel: monnify.paymentMethod ?? 'monnify',
+      metadata: monnify.metaData ?? {},
+      authorization: {
+        authorization_code: '',
+        card_type: '',
+        last4: '',
+        bank: '',
+      },
+    };
+  }
+
+  private async getConfiguredCheckoutProvider(): Promise<PaymentProvider> {
+    const supported =
+      await this.platformConfigService.getSupportedPaymentGateways();
+    const provider = await this.platformConfigService.getDefaultCheckoutProvider();
+
+    if (!supported.includes(provider)) {
+      throw new BadRequestException(
+        `Configured checkout provider ${provider} is not enabled in supported gateways`,
+      );
+    }
+
+    return provider;
+  }
+
+  private async verifyIntentWithProvider(
+    intent: PaymentIntent,
+  ): Promise<PaystackVerifyResponse> {
+    if (intent.provider === PaymentProvider.MONNIFY) {
+      const status = await this.monnifyService.getTransactionStatus({
+        transactionReference: intent.paystackReference,
+        paymentReference: intent.providerPaymentReference,
+      });
+      return this.toPaystackLikeVerifyResponse(status);
+    }
+
+    return this.paystackService.verifyTransaction(intent.paystackReference);
   }
 
   private isSuccessfulVerifyResponse(
@@ -297,6 +391,57 @@ export class PaymentsService {
       where: orWhere,
       order: { createdAt: 'DESC' },
     });
+  }
+
+  private extractWebhookMetadata(
+    provider: PaymentProvider,
+    body: Record<string, unknown>,
+  ): {
+    eventType: string;
+    providerEventId?: string;
+    reference?: string;
+  } {
+    if (provider === PaymentProvider.MONNIFY) {
+      const eventType =
+        typeof body['eventType'] === 'string' ? body['eventType'] : 'unknown';
+      const data =
+        typeof body['eventData'] === 'object' && body['eventData'] !== null
+          ? (body['eventData'] as Record<string, unknown>)
+          : undefined;
+      const providerEventId =
+        typeof data?.['refundReference'] === 'string'
+          ? data['refundReference']
+          : typeof data?.['transactionReference'] === 'string'
+            ? data['transactionReference']
+            : typeof data?.['reference'] === 'string'
+              ? data['reference']
+              : undefined;
+      const reference =
+        typeof data?.['transactionReference'] === 'string'
+          ? data['transactionReference']
+          : typeof data?.['reference'] === 'string'
+            ? data['reference']
+            : undefined;
+
+      return { eventType, providerEventId, reference };
+    }
+
+    const data =
+      typeof body['data'] === 'object' && body['data'] !== null
+        ? (body['data'] as Record<string, unknown>)
+        : undefined;
+    const eventType =
+      typeof body['event'] === 'string' ? body['event'] : 'unknown';
+    const providerEventIdValue = data?.['id'];
+    const providerEventId =
+      typeof providerEventIdValue === 'string' ||
+      typeof providerEventIdValue === 'number'
+        ? String(providerEventIdValue)
+        : undefined;
+    const reference =
+      typeof data?.['reference'] === 'string' ? data['reference'] : undefined;
+
+    return { eventType, providerEventId, reference };
   }
 
   private async getIntentByReferenceOrThrow(
@@ -399,8 +544,9 @@ export class PaymentsService {
         orderId: order.id,
         type: FulfilmentEventType.PAYMENT_RECEIVED,
         actorId: intent.buyerId,
-        notes: `Payment confirmed via Paystack (${verifyResponse.channel})`,
+        notes: `Payment confirmed via ${intent.provider} (${verifyResponse.channel})`,
         metadata: {
+          provider: intent.provider,
           reference: verifyResponse.reference,
           amount: verifyResponse.amount,
           currency: verifyResponse.currency,
@@ -421,6 +567,22 @@ export class PaymentsService {
 
     if (amount <= 0) {
       return;
+    }
+
+    const commissionAmount =
+      Number(order.platformFee ?? 0) > 0
+        ? Number(order.platformFee)
+        : this.calculateCommissionAmount(
+            amount,
+            await this.platformConfigService.getDefaultCommissionRate(),
+          );
+
+    if (Number(order.platformFee ?? 0) !== commissionAmount) {
+      order.platformFee = commissionAmount;
+      await this.orderRepo.save({
+        ...order,
+        platformFee: commissionAmount,
+      });
     }
 
     await Promise.all([
@@ -474,7 +636,7 @@ export class PaymentsService {
         actorId: intent.buyerId,
         eventType: LedgerEventType.SELLER_PENDING_ALLOCATED,
         reference: intent.paystackReference,
-        notes: `Seller proceeds placed on hold pending return-policy release for order ${order.orderReference}`,
+        notes: `Seller gross proceeds placed on hold pending return-policy release for order ${order.orderReference}. Commission snapshot: ${commissionAmount.toFixed(2)} ${order.currency}.`,
       });
     }
   }
@@ -641,12 +803,11 @@ export class PaymentsService {
 
     const storedVerifyResponse = this.buildStoredSuccessfulVerifyResponse(intent);
     const verifyResponse =
-      storedVerifyResponse ??
-      (await this.paystackService.verifyTransaction(intent.paystackReference));
+      storedVerifyResponse ?? (await this.verifyIntentWithProvider(intent));
 
     if (!this.isSuccessfulVerifyResponse(verifyResponse)) {
       throw new BadRequestException(
-        `Cannot apply payment side effects for non-successful Paystack status ${verifyResponse.status}`,
+        `Cannot apply payment side effects for non-successful payment status ${verifyResponse.status}`,
       );
     }
 
@@ -733,9 +894,7 @@ export class PaymentsService {
       verificationsAttempted += 1;
 
       try {
-        const verifyResponse = await this.paystackService.verifyTransaction(
-          intent.paystackReference,
-        );
+        const verifyResponse = await this.verifyIntentWithProvider(intent);
         const previousStatus = intent.status;
         const updatedIntent = await this.finalizeVerifiedPayment(
           intent,
@@ -916,6 +1075,55 @@ export class PaymentsService {
 
     const reference = this.generateReference(order.orderReference);
     const amountKobo = Math.round(Number(order.totalAmount) * 100);
+    const provider = await this.getConfiguredCheckoutProvider();
+
+    if (provider === PaymentProvider.MONNIFY) {
+      const monnifyResponse = await this.monnifyService.initializeTransaction({
+        amount: Number(order.totalAmount),
+        currencyCode: order.currency,
+        paymentReference: reference,
+        customerName:
+          [buyer.firstName, buyer.lastName].filter(Boolean).join(' ') ||
+          buyer.email,
+        customerEmail: buyer.email,
+        paymentDescription: `Order checkout for ${order.orderReference}`,
+        redirectUrl: dto.callbackUrl,
+        paymentMethods: this.normalizeChannels(dto.channels)?.map((channel) =>
+          channel === 'bank_transfer'
+            ? 'ACCOUNT_TRANSFER'
+            : channel.toUpperCase(),
+        ),
+        metadata: {
+          order_reference: order.orderReference,
+          order_id: order.id,
+          buyer_id: user.id,
+          seller_profile_id: order.sellerProfileId,
+        },
+      });
+
+      const monnifyIntent = await this.paymentIntentRepo.save(
+        this.paymentIntentRepo.create({
+          orderId: order.id,
+          buyerId: user.id,
+          paystackReference: monnifyResponse.transactionReference,
+          provider: PaymentProvider.MONNIFY,
+          providerPaymentReference: monnifyResponse.paymentReference,
+          idempotencyKey,
+          amountKobo,
+          currency: order.currency,
+          status: PaymentIntentStatus.PROCESSING,
+          authorizationUrl: monnifyResponse.checkoutUrl,
+        }),
+      );
+
+      return {
+        ...monnifyIntent,
+        authorizationUrl: monnifyResponse.checkoutUrl,
+        reference: monnifyResponse.transactionReference,
+        paymentReference: monnifyResponse.paymentReference,
+      };
+    }
+
     const paystackResponse: PaystackInitResponse =
       await this.paystackService.initializeTransaction({
         email: buyer.email,
@@ -937,6 +1145,7 @@ export class PaymentsService {
         orderId: order.id,
         buyerId: user.id,
         paystackReference: paystackResponse.reference,
+        provider: PaymentProvider.PAYSTACK,
         idempotencyKey,
         amountKobo,
         currency: order.currency,
@@ -955,35 +1164,29 @@ export class PaymentsService {
 
   async verifyCheckout(reference: string, user: AuthenticatedUser) {
     const intent = await this.ensureBuyerOwnsIntent(reference, user);
-    const verifyResponse =
-      await this.paystackService.verifyTransaction(reference);
+    const verifyResponse = await this.verifyIntentWithProvider(intent);
     const updatedIntent = await this.finalizeVerifiedPayment(
       intent,
       verifyResponse,
     );
 
     return {
+      provider: updatedIntent.provider,
       paymentIntent: updatedIntent,
+      providerResponse: verifyResponse,
       paystack: verifyResponse,
     };
   }
 
-  async enqueueWebhook(body: Record<string, unknown>) {
-    const data = body['data'] as Record<string, unknown> | undefined;
-    const paystackEventIdValue = data?.['id'];
-    const paystackEventId =
-      typeof paystackEventIdValue === 'string' ||
-      typeof paystackEventIdValue === 'number'
-        ? String(paystackEventIdValue)
-        : '';
-    const eventTypeValue = body['event'];
-    const eventType =
-      typeof eventTypeValue === 'string' ? eventTypeValue : 'unknown';
-    const reference =
-      typeof data?.['reference'] === 'string' ? data['reference'] : undefined;
+  async enqueueWebhook(
+    provider: PaymentProvider,
+    body: Record<string, unknown>,
+  ) {
+    const { eventType, providerEventId, reference } =
+      this.extractWebhookMetadata(provider, body);
     const existingEvent = await this.findExistingWebhookEvent(
       eventType,
-      paystackEventId || undefined,
+      providerEventId,
       reference,
     );
 
@@ -1007,7 +1210,7 @@ export class PaymentsService {
       : await this.webhookRepo.save(
           this.webhookRepo.create({
             eventType,
-            paystackEventId: paystackEventId || undefined,
+            paystackEventId: providerEventId,
             reference,
             rawPayload: body,
             processed: false,
@@ -1050,9 +1253,15 @@ export class PaymentsService {
       if (event.eventType === 'charge.success' && event.reference) {
         const intent = await this.getIntentByReferenceOrThrow(event.reference);
         if (intent.status !== PaymentIntentStatus.SUCCEEDED) {
-          const verifyResponse = await this.paystackService.verifyTransaction(
-            event.reference,
-          );
+          const verifyResponse = await this.verifyIntentWithProvider(intent);
+          await this.finalizeVerifiedPayment(intent, verifyResponse);
+        }
+      }
+
+      if (event.eventType === 'SUCCESSFUL_TRANSACTION' && event.reference) {
+        const intent = await this.getIntentByReferenceOrThrow(event.reference);
+        if (intent.status !== PaymentIntentStatus.SUCCEEDED) {
+          const verifyResponse = await this.verifyIntentWithProvider(intent);
           await this.finalizeVerifiedPayment(intent, verifyResponse);
         }
       }
@@ -1083,6 +1292,14 @@ export class PaymentsService {
       }
 
       if (
+        event.eventType === 'SUCCESSFUL_DISBURSEMENT' ||
+        event.eventType === 'FAILED_DISBURSEMENT' ||
+        event.eventType === 'REVERSED_DISBURSEMENT'
+      ) {
+        await this.payoutsService.processMonnifyWebhook(event.eventType, body);
+      }
+
+      if (
         event.eventType === 'refund.pending' ||
         event.eventType === 'refund.processing' ||
         event.eventType === 'refund.needs-attention' ||
@@ -1090,6 +1307,13 @@ export class PaymentsService {
         event.eventType === 'refund.processed'
       ) {
         await this.refundsService.processPaystackWebhook(event.eventType, body);
+      }
+
+      if (
+        event.eventType === 'SUCCESSFUL_REFUND' ||
+        event.eventType === 'FAILED_REFUND'
+      ) {
+        await this.refundsService.processMonnifyWebhook(event.eventType, body);
       }
 
       await this.webhookRepo.save({
@@ -1108,7 +1332,7 @@ export class PaymentsService {
         processed: false,
         error: message,
       });
-      this.logger.error(`Failed to process Paystack webhook: ${message}`);
+      this.logger.error(`Failed to process payment webhook: ${message}`);
       throw error;
     }
   }

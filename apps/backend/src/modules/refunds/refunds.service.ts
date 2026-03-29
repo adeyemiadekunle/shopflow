@@ -19,11 +19,13 @@ import {
 } from '../orders/entities/fulfilment-event.entity';
 import { Order } from '../orders/entities/order.entity';
 import { OrderStatus } from '../orders/enums/order-status.enum';
-import { PaymentIntent, PaymentIntentStatus } from '../payments/entities/payment-intent.entity';
 import {
-  PaystackRefundResponse,
-  PaystackService,
-} from '../payments/paystack.service';
+  PaymentIntent,
+  PaymentIntentStatus,
+} from '../payments/entities/payment-intent.entity';
+import { PaymentProvider } from '../payments/enums/payment-provider.enum';
+import { MonnifyService } from '../payments/monnify.service';
+import { PaystackService } from '../payments/paystack.service';
 import { CreateRefundDto, RetryRefundWithBuyerDetailsDto } from './dto/admin-refund.dto';
 import { Refund, RefundStatus } from './entities/refund.entity';
 
@@ -43,6 +45,7 @@ export class RefundsService {
     private readonly ledgerService: LedgerService,
     @Inject(forwardRef(() => PaystackService))
     private readonly paystackService: PaystackService,
+    private readonly monnifyService: MonnifyService,
   ) {}
 
   private normalizeLimit(limit: number, fallback: number): number {
@@ -86,6 +89,23 @@ export class RefundsService {
       default:
         return RefundStatus.PENDING;
     }
+  }
+
+  private mapMonnifyRefundStatus(status: string): RefundStatus {
+    switch ((status ?? '').toUpperCase()) {
+      case 'COMPLETED':
+        return RefundStatus.PROCESSED;
+      case 'FAILED':
+        return RefundStatus.FAILED;
+      case 'PROCESSING':
+        return RefundStatus.PROCESSING;
+      default:
+        return RefundStatus.PENDING;
+    }
+  }
+
+  private generateMonnifyRefundReference(orderReference: string): string {
+    return `MNF-REF-${orderReference}-${Date.now()}`;
   }
 
   private async getOrderOrThrow(orderId: string): Promise<Order> {
@@ -261,7 +281,7 @@ export class RefundsService {
     await this.completeRefundLedger(
       refund,
       'system',
-      `Refund ${refund.id} processed successfully via Paystack`,
+      `Refund ${refund.id} processed successfully via ${refund.provider}`,
     );
 
     await this.paymentIntentRepo.save({
@@ -279,9 +299,12 @@ export class RefundsService {
         orderId: order.id,
         type: FulfilmentEventType.REFUNDED,
         actorId: 'system',
-        notes: 'Refund processed successfully via Paystack.',
+        notes: `Refund processed successfully via ${refund.provider}.`,
         metadata: {
           refundId: refund.id,
+          provider: refund.provider,
+          providerRefundReference: refund.providerRefundReference,
+          providerRefundId: refund.providerRefundId,
           paystackRefundId: refund.paystackRefundId,
         },
       }),
@@ -339,6 +362,35 @@ export class RefundsService {
     });
   }
 
+  private async applyMonnifyRefundStatus(
+    refund: Refund,
+    payload: Record<string, unknown>,
+  ): Promise<void> {
+    const data =
+      typeof payload['eventData'] === 'object' && payload['eventData'] !== null
+        ? (payload['eventData'] as Record<string, unknown>)
+        : payload;
+    const mappedStatus = this.mapMonnifyRefundStatus(
+      this.getString(data, 'refundStatus') ?? 'PENDING',
+    );
+
+    if (mappedStatus === RefundStatus.PROCESSED) {
+      await this.finalizeProcessedRefund(refund, payload);
+      return;
+    }
+
+    await this.refundRepo.save({
+      ...refund,
+      status: mappedStatus,
+      rawPayload: payload,
+      failureReason:
+        this.getString(data, 'comment') ??
+        this.getString(data, 'refundReason') ??
+        refund.failureReason,
+      failedAt: mappedStatus === RefundStatus.FAILED ? new Date() : refund.failedAt,
+    });
+  }
+
   async listAdminRefunds(limit: number, status?: RefundStatus) {
     return this.refundRepo.find({
       where: status ? { status } : {},
@@ -378,36 +430,90 @@ export class RefundsService {
 
     await this.reserveRefundAmount(order, paymentIntent, adminId, amount, notes);
 
-    const paystackRefund = await this.paystackService.createRefund({
-      transaction: paymentIntent.paystackReference,
-      amountKobo: Math.round(amount * 100),
-      currency: order.currency,
-      customerNote: dto.customerNote?.trim(),
-      merchantNote: notes,
-    });
+    let refund: Refund;
 
-    const refund = await this.refundRepo.save(
-      this.refundRepo.create({
-        orderId: order.id,
-        paymentIntentId: paymentIntent.id,
+    if (paymentIntent.provider === PaymentProvider.MONNIFY) {
+      const refundReference = this.generateMonnifyRefundReference(
+        order.orderReference,
+      );
+      const monnifyRefund = await this.monnifyService.createRefund({
         transactionReference: paymentIntent.paystackReference,
-        paystackRefundId:
-          paystackRefund.id !== undefined ? String(paystackRefund.id) : undefined,
-        amount,
+        refundAmount: amount,
+        refundReference,
+        refundReason: notes,
+        customerNote:
+          dto.customerNote?.trim() ?? 'Order refund approved by admin.',
+        destinationAccountNumber: dto.destinationAccountNumber?.trim(),
+        destinationAccountBankCode: dto.destinationBankCode?.trim(),
+      });
+
+      refund = await this.refundRepo.save(
+        this.refundRepo.create({
+          orderId: order.id,
+          paymentIntentId: paymentIntent.id,
+          transactionReference: paymentIntent.paystackReference,
+          provider: paymentIntent.provider,
+          providerRefundReference: monnifyRefund.refundReference,
+          providerRefundId: monnifyRefund.refundReference,
+          amount,
+          currency: order.currency,
+          status: this.mapMonnifyRefundStatus(monnifyRefund.refundStatus),
+          reason: dto.reason?.trim(),
+          customerNote: dto.customerNote?.trim(),
+          merchantNote: notes,
+          customerAccountNumber: dto.destinationAccountNumber?.trim(),
+          customerBankId: dto.destinationBankCode?.trim(),
+          initiatedById: adminId,
+          rawPayload: monnifyRefund as unknown as Record<string, unknown>,
+        }),
+      );
+    } else {
+      const paystackRefund = await this.paystackService.createRefund({
+        transaction: paymentIntent.paystackReference,
+        amountKobo: Math.round(amount * 100),
         currency: order.currency,
-        status: this.mapPaystackRefundStatus(paystackRefund.status),
-        reason: dto.reason?.trim(),
         customerNote: dto.customerNote?.trim(),
         merchantNote: notes,
-        initiatedById: adminId,
-        rawPayload: paystackRefund as unknown as Record<string, unknown>,
-      }),
-    );
+      });
+
+      refund = await this.refundRepo.save(
+        this.refundRepo.create({
+          orderId: order.id,
+          paymentIntentId: paymentIntent.id,
+          transactionReference: paymentIntent.paystackReference,
+          provider: paymentIntent.provider,
+          paystackRefundId:
+            paystackRefund.id !== undefined
+              ? String(paystackRefund.id)
+              : undefined,
+          providerRefundId:
+            paystackRefund.id !== undefined
+              ? String(paystackRefund.id)
+              : undefined,
+          amount,
+          currency: order.currency,
+          status: this.mapPaystackRefundStatus(paystackRefund.status),
+          reason: dto.reason?.trim(),
+          customerNote: dto.customerNote?.trim(),
+          merchantNote: notes,
+          initiatedById: adminId,
+          rawPayload: paystackRefund as unknown as Record<string, unknown>,
+        }),
+      );
+    }
 
     await this.orderRepo.save({
       ...order,
       status: OrderStatus.REFUND_PENDING,
     });
+
+    if (refund.status === RefundStatus.PROCESSED) {
+      await this.finalizeProcessedRefund(
+        refund,
+        refund.rawPayload ?? ({} as Record<string, unknown>),
+      );
+      return this.getRefundOrThrow(refund.id);
+    }
 
     return refund;
   }
@@ -431,6 +537,86 @@ export class RefundsService {
     dto: RetryRefundWithBuyerDetailsDto,
   ) {
     const refund = await this.getRefundOrThrow(refundId);
+
+    if (refund.provider === PaymentProvider.MONNIFY) {
+      if (!refund.providerRefundReference) {
+        throw new BadRequestException(
+          'This Monnify refund has no provider refund reference to retry',
+        );
+      }
+
+      const currentStatus = await this.monnifyService.getRefundStatus(
+        refund.providerRefundReference,
+      );
+      const mappedStatus = this.mapMonnifyRefundStatus(
+        currentStatus.refundStatus,
+      );
+
+      if (mappedStatus === RefundStatus.PROCESSED) {
+        await this.finalizeProcessedRefund(
+          refund,
+          currentStatus as unknown as Record<string, unknown>,
+        );
+        return this.getRefundOrThrow(refund.id);
+      }
+
+      if (mappedStatus === RefundStatus.PROCESSING) {
+        return this.refundRepo.save({
+          ...refund,
+          status: RefundStatus.PROCESSING,
+          customerBankId: dto.bankId,
+          customerAccountNumber: dto.accountNumber,
+          customerAccountCurrency: dto.currency,
+          customerAccountName: dto.accountName?.trim(),
+          initiatedById: adminId,
+          rawPayload: currentStatus as unknown as Record<string, unknown>,
+          failureReason: undefined,
+        });
+      }
+
+      const newRefundReference = this.generateMonnifyRefundReference(
+        refund.order.orderReference,
+      );
+      const retriedRefund = await this.monnifyService.createRefund({
+        transactionReference: refund.transactionReference,
+        refundAmount: this.getAmountNgn(refund),
+        refundReference: newRefundReference,
+        refundReason:
+          refund.reason?.trim() ?? refund.merchantNote?.trim() ?? 'Refund retry',
+        customerNote:
+          refund.customerNote?.trim() ??
+          dto.accountName?.trim() ??
+          'Refund retry approved by admin.',
+        destinationAccountNumber: dto.accountNumber,
+        destinationAccountBankCode: dto.bankId,
+      });
+
+      const nextStatus = this.mapMonnifyRefundStatus(retriedRefund.refundStatus);
+
+      const savedRefund = await this.refundRepo.save({
+        ...refund,
+        providerRefundReference: retriedRefund.refundReference,
+        providerRefundId: retriedRefund.refundReference,
+        status: nextStatus,
+        customerBankId: dto.bankId,
+        customerAccountNumber: dto.accountNumber,
+        customerAccountCurrency: dto.currency,
+        customerAccountName: dto.accountName?.trim(),
+        initiatedById: adminId,
+        rawPayload: retriedRefund as unknown as Record<string, unknown>,
+        failureReason: undefined,
+      });
+
+      if (nextStatus === RefundStatus.PROCESSED) {
+        await this.finalizeProcessedRefund(
+          savedRefund,
+          retriedRefund as unknown as Record<string, unknown>,
+        );
+        return this.getRefundOrThrow(savedRefund.id);
+      }
+
+      return savedRefund;
+    }
 
     if (refund.status !== RefundStatus.NEEDS_ATTENTION) {
       throw new BadRequestException(
@@ -506,6 +692,45 @@ export class RefundsService {
     }
 
     await this.applyRefundWebhookStatus(refund, payload, eventType);
+    return true;
+  }
+
+  async processMonnifyWebhook(
+    eventType: string,
+    payload: Record<string, unknown>,
+  ): Promise<boolean> {
+    if (
+      eventType !== 'SUCCESSFUL_REFUND' &&
+      eventType !== 'FAILED_REFUND'
+    ) {
+      return false;
+    }
+
+    const data =
+      typeof payload['eventData'] === 'object' && payload['eventData'] !== null
+        ? (payload['eventData'] as Record<string, unknown>)
+        : undefined;
+    const refundReference = this.getString(data, 'refundReference');
+    const transactionReference = this.getString(data, 'transactionReference');
+
+    const refund = await this.refundRepo.findOne({
+      where: [
+        ...(refundReference
+          ? [{ providerRefundReference: refundReference }]
+          : []),
+        ...(transactionReference
+          ? [{ transactionReference }]
+          : []),
+      ],
+      relations: ['order', 'paymentIntent'],
+      order: { createdAt: 'DESC' },
+    });
+
+    if (!refund) {
+      return false;
+    }
+
+    await this.applyMonnifyRefundStatus(refund, payload);
     return true;
   }
 }

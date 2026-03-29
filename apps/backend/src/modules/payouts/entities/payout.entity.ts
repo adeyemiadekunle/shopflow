@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { SellerProfile } from '../../sellers/entities/seller-profile.entity';
 import { BankAccount } from '../../sellers/entities/bank-account.entity';
+import { PaymentProvider } from '../../payments/enums/payment-provider.enum';
 
 export enum PayoutStatus {
   REQUESTED = 'requested',
@@ -41,6 +42,13 @@ export class Payout {
 
   @Column({ name: 'reference', unique: true, length: 100 })
   reference!: string;
+
+  @Column({
+    type: 'enum',
+    enum: PaymentProvider,
+    default: PaymentProvider.PAYSTACK,
+  })
+  provider!: PaymentProvider;
 
   @Column({
     name: 'amount',
@@ -89,6 +97,18 @@ export class Payout {
 
   @Column({ name: 'paystack_recipient_code', nullable: true })
   paystackRecipientCode?: string;
+
+  @Column({ name: 'provider_transfer_reference', nullable: true })
+  providerTransferReference?: string;
+
+  @Column({ name: 'provider_transfer_id', nullable: true })
+  providerTransferId?: string;
+
+  @Column({ name: 'provider_batch_reference', nullable: true })
+  providerBatchReference?: string;
+
+  @Column({ name: 'provider_recipient_reference', nullable: true })
+  providerRecipientReference?: string;
 
   @Column({ name: 'raw_transfer_payload', type: 'jsonb', nullable: true })
   rawTransferPayload?: Record<string, unknown>;
