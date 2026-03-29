@@ -107,6 +107,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const message = await this.chatService.sendMessage(
       data.conversationId,
       user.id,
+      user.sellerProfileId,
       senderRole,
       data.content,
     );

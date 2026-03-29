@@ -39,11 +39,14 @@ export class ChatController {
   @ApiQuery({ name: 'limit', required: false })
   getMessages(
     @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
     return this.chatService.getMessages(
       id,
+      user.id,
+      user.sellerProfileId,
       page ? parseInt(page, 10) : 1,
       limit ? parseInt(limit, 10) : 50,
     );
@@ -52,6 +55,6 @@ export class ChatController {
   @Patch('conversations/:id/read')
   @ApiOperation({ summary: 'Mark all messages in a conversation as read' })
   markAsRead(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.chatService.markAsRead(id, user.id);
+    return this.chatService.markAsRead(id, user.id, user.sellerProfileId);
   }
 }
