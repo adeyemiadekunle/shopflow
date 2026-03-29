@@ -34,6 +34,21 @@ export class ProductMedia {
   @Column({ name: 'cdn_key', nullable: true })
   cdnKey?: string;
 
+  @Column({ name: 'thumbnail_url', nullable: true })
+  thumbnailUrl?: string;
+
+  @Column({ name: 'width', type: 'int', nullable: true })
+  width?: number;
+
+  @Column({ name: 'height', type: 'int', nullable: true })
+  height?: number;
+
+  @Column({ name: 'duration_seconds', type: 'int', nullable: true })
+  durationSeconds?: number;
+
+  @Column({ name: 'size_bytes', type: 'int', nullable: true })
+  sizeBytes?: number;
+
   @Column({ name: 'display_order', default: 0 })
   displayOrder!: number;
 

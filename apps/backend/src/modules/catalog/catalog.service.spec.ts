@@ -1,4 +1,8 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { MediaService } from '../media/media.service';
@@ -188,5 +192,71 @@ describe('CatalogService', () => {
     await expect(service.findById('product-1')).rejects.toThrow(
       NotFoundException,
     );
+  });
+
+  it('createProductForSeller() should normalize product media to a single primary image', async () => {
+    mockSellersService.assertCanManageProducts.mockResolvedValue({
+      id: 'seller-1',
+    });
+    mockProductRepo.create.mockImplementation(
+      (value: Record<string, unknown>) => value,
+    );
+    mockMediaRepo.create.mockImplementation(
+      (value: Record<string, unknown>) => value,
+    );
+    mockProductRepo.save.mockImplementation(
+      (value: Record<string, unknown>) => value,
+    );
+
+    const result = await service.createProductForSeller('user-1', {
+      title: 'Premium Ankara Gown',
+      basePrice: 15000,
+      currency: 'NGN',
+      media: [
+        {
+          type: 'image',
+          url: 'https://cdn.rands.ng/products/ankara-1.webp',
+          isPrimary: false,
+        },
+        {
+          type: 'image',
+          url: 'https://cdn.rands.ng/products/ankara-2.webp',
+          isPrimary: true,
+        },
+      ],
+    });
+
+    expect(result.media).toEqual([
+      expect.objectContaining({
+        url: 'https://cdn.rands.ng/products/ankara-1.webp',
+        displayOrder: 0,
+        isPrimary: false,
+      }),
+      expect.objectContaining({
+        url: 'https://cdn.rands.ng/products/ankara-2.webp',
+        displayOrder: 1,
+        isPrimary: true,
+      }),
+    ]);
+  });
+
+  it('createProductForSeller() should reject video media without a thumbnail', async () => {
+    mockSellersService.assertCanManageProducts.mockResolvedValue({
+      id: 'seller-1',
+    });
+
+    await expect(
+      service.createProductForSeller('user-1', {
+        title: 'Premium Ankara Gown',
+        basePrice: 15000,
+        currency: 'NGN',
+        media: [
+          {
+            type: 'video',
+            url: 'https://cdn.rands.ng/products/ankara-clip.mp4',
+          },
+        ],
+      }),
+    ).rejects.toThrow(BadRequestException);
   });
 });

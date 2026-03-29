@@ -133,4 +133,36 @@ describe('FeedService', () => {
 
     expect(post.productId).toBe('product-1');
   });
+
+  it('createPost() should reject duplicate feed media URLs', async () => {
+    await expect(
+      service.createPost('seller-1', {
+        content: 'New drop',
+        media: [
+          {
+            type: UploadMediaType.IMAGE,
+            url: 'https://cdn.rands.test/a',
+          },
+          {
+            type: UploadMediaType.IMAGE,
+            url: 'https://cdn.rands.test/a',
+          },
+        ],
+      }),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('createPost() should reject video media without a thumbnail', async () => {
+    await expect(
+      service.createPost('seller-1', {
+        content: 'New drop',
+        media: [
+          {
+            type: UploadMediaType.VIDEO,
+            url: 'https://cdn.rands.test/video.mp4',
+          },
+        ],
+      }),
+    ).rejects.toThrow(ForbiddenException);
+  });
 });

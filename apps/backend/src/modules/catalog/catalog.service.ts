@@ -22,6 +22,8 @@ import {
 
 @Injectable()
 export class CatalogService {
+  private static readonly MAX_MEDIA_ITEMS = 8;
+
   constructor(
     @InjectRepository(Product)
     private readonly productRepo: Repository<Product>,
@@ -204,16 +206,83 @@ export class CatalogService {
         type: item.type,
         url: item.url.trim(),
         cdnKey: item.cdnKey?.trim(),
+        thumbnailUrl: item.thumbnailUrl?.trim(),
+        width: item.width,
+        height: item.height,
+        durationSeconds: item.durationSeconds,
+        sizeBytes: item.sizeBytes,
         displayOrder: item.displayOrder ?? index,
         isPrimary: item.isPrimary ?? index === 0,
       }),
     );
   }
 
+  private normalizeProductMedia(
+    media?: CreateProductDto['media'],
+  ): CreateProductDto['media'] | undefined {
+    if (!media?.length) {
+      return media;
+    }
+
+    if (media.length > CatalogService.MAX_MEDIA_ITEMS) {
+      throw new BadRequestException(
+        `Products can include at most ${CatalogService.MAX_MEDIA_ITEMS} media items`,
+      );
+    }
+
+    const normalized = media.map((item, index) => ({
+      ...item,
+      type: item.type ?? MediaType.IMAGE,
+      url: item.url.trim(),
+      cdnKey: item.cdnKey?.trim(),
+      thumbnailUrl: item.thumbnailUrl?.trim(),
+      displayOrder: index,
+      isPrimary: item.isPrimary ?? false,
+    }));
+
+    const uniqueUrls = new Set(normalized.map((item) => item.url));
+    if (uniqueUrls.size !== normalized.length) {
+      throw new BadRequestException('Duplicate product media URLs are not allowed');
+    }
+
+    const videoItems = normalized.filter((item) => item.type === MediaType.VIDEO);
+    if (videoItems.length > 1) {
+      throw new BadRequestException('Products can include at most one video');
+    }
+
+    for (const item of videoItems) {
+      if (!item.thumbnailUrl) {
+        throw new BadRequestException(
+          'Video product media must include a thumbnailUrl',
+        );
+      }
+    }
+
+    const imageIndex = normalized.findIndex((item) => item.type === MediaType.IMAGE);
+    const preferredPrimaryIndex =
+      imageIndex >= 0
+        ? normalized.findIndex(
+            (item) => item.type === MediaType.IMAGE && item.isPrimary,
+          )
+        : normalized.findIndex((item) => item.isPrimary);
+    const resolvedPrimaryIndex =
+      preferredPrimaryIndex >= 0
+        ? preferredPrimaryIndex
+        : imageIndex >= 0
+          ? imageIndex
+          : 0;
+
+    return normalized.map((item, index) => ({
+      ...item,
+      isPrimary: index === resolvedPrimaryIndex,
+    }));
+  }
+
   private validateProductMedia(
     media?: Array<{
       type?: MediaType;
       url: string;
+      thumbnailUrl?: string;
       isPrimary?: boolean;
     }>,
     nextStatus?: ProductStatus,
@@ -230,6 +299,9 @@ export class CatalogService {
     const imageCount = media.filter(
       (item) => (item.type ?? MediaType.IMAGE) === MediaType.IMAGE,
     ).length;
+    const videoCount = media.filter(
+      (item) => (item.type ?? MediaType.IMAGE) === MediaType.VIDEO,
+    ).length;
 
     if (nextStatus === ProductStatus.ACTIVE && imageCount === 0) {
       throw new BadRequestException(
@@ -237,11 +309,32 @@ export class CatalogService {
       );
     }
 
+    if (videoCount > 1) {
+      throw new BadRequestException('Products can include at most one video');
+    }
+
     for (const item of media) {
       if (!this.mediaService.isAllowedPublicUrl(item.url.trim())) {
         throw new BadRequestException(
           'Product media must use the configured CloudFront media base URL',
         );
+      }
+
+      if (
+        (item.type ?? MediaType.IMAGE) === MediaType.VIDEO &&
+        !item.thumbnailUrl?.trim()
+      ) {
+        throw new BadRequestException(
+          'Video product media must include a thumbnailUrl',
+        );
+      }
+
+      if (item.thumbnailUrl?.trim()) {
+        if (!this.mediaService.isAllowedPublicUrl(item.thumbnailUrl.trim())) {
+          throw new BadRequestException(
+            'Product media thumbnails must use the configured CloudFront media base URL',
+          );
+        }
       }
     }
   }
@@ -306,12 +399,13 @@ export class CatalogService {
     userId: string,
     dto: CreateProductDto,
   ): Promise<Product> {
+    const normalizedMedia = this.normalizeProductMedia(dto.media);
     const seller = await this.sellersService.assertCanManageProducts(userId);
     await this.ensureCategoryExists(dto.categoryId);
     this.validateDiscount(dto);
-    this.validateProductMedia(dto.media, dto.status ?? ProductStatus.DRAFT);
+    this.validateProductMedia(normalizedMedia, dto.status ?? ProductStatus.DRAFT);
     await this.assertSellerProductLimits({
-      nextMedia: dto.media,
+      nextMedia: normalizedMedia,
     });
 
     const product = this.productRepo.create({
@@ -339,7 +433,7 @@ export class CatalogService {
 
     const savedProduct = await this.productRepo.save(product);
     const variants = this.buildVariantEntities(savedProduct.id, dto.variants);
-    const media = this.buildMediaEntities(savedProduct.id, dto.media);
+    const media = this.buildMediaEntities(savedProduct.id, normalizedMedia);
 
     return this.productRepo.save({
       ...savedProduct,
@@ -355,6 +449,8 @@ export class CatalogService {
   ): Promise<Product> {
     await this.sellersService.assertCanManageProducts(userId);
     const product = await this.getOwnedProductOrThrow(userId, productId);
+    const normalizedMedia =
+      dto.media === undefined ? undefined : this.normalizeProductMedia(dto.media);
     const nextBasePrice = dto.basePrice ?? Number(product.basePrice);
     const nextHasDiscount = dto.hasDiscount ?? product.hasDiscount;
     const nextDiscountType = nextHasDiscount
@@ -386,11 +482,11 @@ export class CatalogService {
       discountEndsAt: discountEndsAt?.toISOString(),
     });
     this.validateProductMedia(
-      dto.media === undefined ? product.media : dto.media,
+      normalizedMedia === undefined ? product.media : normalizedMedia,
       dto.status ?? product.status,
     );
     await this.assertSellerProductLimits({
-      nextMedia: dto.media === undefined ? product.media : dto.media,
+      nextMedia: normalizedMedia === undefined ? product.media : normalizedMedia,
     });
 
     if (dto.variants !== undefined) {
@@ -432,9 +528,9 @@ export class CatalogService {
           ? product.variants
           : this.buildVariantEntities(productId, dto.variants),
       media:
-        dto.media === undefined
+        normalizedMedia === undefined
           ? product.media
-          : this.buildMediaEntities(productId, dto.media),
+          : this.buildMediaEntities(productId, normalizedMedia),
     });
 
     const reloaded = await this.productRepo.findOne({
