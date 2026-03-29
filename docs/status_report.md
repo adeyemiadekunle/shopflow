@@ -59,6 +59,11 @@ Implemented:
 - variants, categories, media
 - discounts and effective price logic
 - ownership and onboarding checks
+- richer media validation and normalization
+  - duplicate URL rejection
+  - single-video rule
+  - primary-media normalization
+  - video thumbnail requirement
 
 Still missing / optional:
 - richer moderation/admin tooling
@@ -70,9 +75,15 @@ Implemented:
 - AWS S3 presigned upload flow
 - CloudFront public media delivery
 - image-first catalog/feed media support
+- richer product media metadata model
+  - `thumbnailUrl`
+  - `width`
+  - `height`
+  - `durationSeconds`
+  - `sizeBytes`
 
 Still missing / optional:
-- thumbnail/poster generation
+- thumbnail/poster generation automation
 - real video processing pipeline
 - richer media metadata lifecycle
 
@@ -83,6 +94,10 @@ Implemented:
 - likes, comments
 - follow / unfollow
 - typed media support
+- richer media validation and limits
+  - duplicate URL rejection
+  - single-video rule
+  - required thumbnail for video posts
 
 Still missing / optional:
 - moderation / ranking / admin controls
@@ -230,7 +245,7 @@ Still missing / optional:
 ## Best Next Steps
 
 1. Queue and ops hardening
-2. Media/video processing polish
+2. Video processing pipeline and media automation
 3. Notification expansion
 4. Final finance / ledger reporting pass
 5. Admin reporting / exports

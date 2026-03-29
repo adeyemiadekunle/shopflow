@@ -50,7 +50,7 @@ Current source of truth for module status lives in:
 
 - [x] Add seller analytics endpoints and dashboard-ready summaries
 - [x] Add platform/admin analytics endpoints and dashboard-ready summaries
-- [ ] Add richer catalog/feed media polish
+- [x] Add richer catalog/feed media polish
 - [ ] Add video-processing pipeline after image-first rollout
 - [ ] Add first-time checkout support for separate raw `billingAddress`
 - [ ] Add moderation / admin tooling for feed, chat, and catalog
@@ -86,7 +86,7 @@ Current source of truth for module status lives in:
 ## Suggested Next Order
 
 1. Queue and ops hardening
-2. Media/video processing polish
+2. Video processing pipeline and media automation
 3. Notification expansion
 4. Final finance and ledger reporting pass
 5. Admin reporting / exports

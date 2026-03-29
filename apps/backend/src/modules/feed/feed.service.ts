@@ -20,6 +20,8 @@ import { CreateFeedPostDto, CreateCommentDto } from './dto/feed.dto';
 
 @Injectable()
 export class FeedService {
+  private static readonly MAX_MEDIA_ITEMS = 4;
+
   constructor(
     @InjectRepository(FeedPost)
     private readonly postRepo: Repository<FeedPost>,
@@ -47,19 +49,60 @@ export class FeedService {
     return post;
   }
 
+  private normalizeFeedMedia(
+    media: FeedPostMedia[],
+  ): FeedPostMedia[] {
+    if (media.length > FeedService.MAX_MEDIA_ITEMS) {
+      throw new ForbiddenException(
+        `Feed posts can include at most ${FeedService.MAX_MEDIA_ITEMS} media items`,
+      );
+    }
+
+    const normalized = media.map((item) => ({
+      ...item,
+      type: item.type ?? UploadMediaType.IMAGE,
+      url: item.url.trim(),
+      cdnKey: item.cdnKey?.trim(),
+      thumbnailUrl: item.thumbnailUrl?.trim(),
+    }));
+
+    const uniqueUrls = new Set(normalized.map((item) => item.url));
+    if (uniqueUrls.size !== normalized.length) {
+      throw new ForbiddenException('Duplicate feed media URLs are not allowed');
+    }
+
+    const videoItems = normalized.filter(
+      (item) => item.type === UploadMediaType.VIDEO,
+    );
+    if (videoItems.length > 1) {
+      throw new ForbiddenException('Feed posts can include at most one video');
+    }
+
+    for (const item of videoItems) {
+      if (!item.thumbnailUrl) {
+        throw new ForbiddenException(
+          'Feed video posts must include a thumbnailUrl',
+        );
+      }
+    }
+
+    return normalized;
+  }
+
   // ─── Posts ──────────────────────────────────────────────────────────────────
 
   async createPost(
     sellerProfileId: string,
     dto: CreateFeedPostDto,
   ): Promise<FeedPost> {
-    const media: FeedPostMedia[] =
+    const rawMedia: FeedPostMedia[] =
       dto.media ??
       dto.mediaUrls?.map((url) => ({
         type: UploadMediaType.IMAGE,
         url,
       })) ??
       [];
+    const media = this.normalizeFeedMedia(rawMedia);
 
     const feedEnabled = await this.platformConfigService.getBoolean(
       PlatformConfigKey.FEATURE_FEED_ENABLED,
@@ -96,6 +139,15 @@ export class FeedService {
       if (!this.mediaService.isAllowedPublicUrl(item.url.trim())) {
         throw new ForbiddenException(
           'Feed media must use the configured CloudFront media base URL',
+        );
+      }
+
+      if (
+        item.thumbnailUrl?.trim() &&
+        !this.mediaService.isAllowedPublicUrl(item.thumbnailUrl.trim())
+      ) {
+        throw new ForbiddenException(
+          'Feed media thumbnails must use the configured CloudFront media base URL',
         );
       }
     }

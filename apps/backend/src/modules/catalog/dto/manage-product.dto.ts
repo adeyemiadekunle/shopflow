@@ -13,6 +13,7 @@ import {
   IsString,
   IsUUID,
   Matches,
+  Max,
   MaxLength,
   Min,
   MinLength,
@@ -69,6 +70,40 @@ export class UpsertProductMediaDto {
   @IsOptional()
   @IsString()
   cdnKey?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  thumbnailUrl?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  width?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  height?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  durationSeconds?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(50_000_000)
+  sizeBytes?: number;
 
   @ApiPropertyOptional({ default: 0 })
   @IsOptional()
