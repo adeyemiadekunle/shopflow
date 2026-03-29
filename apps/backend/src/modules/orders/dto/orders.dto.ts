@@ -4,6 +4,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsBoolean,
+  IsEnum,
   IsInt,
   IsOptional,
   IsString,
@@ -117,4 +118,42 @@ export class RespondToQuoteDto {
   @Type(() => Boolean)
   @IsBoolean()
   accept!: boolean;
+}
+
+export class UpdateOrderProgressDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  notes?: string;
+}
+
+export class OpenDisputeDto {
+  @ApiProperty()
+  @IsString()
+  @MaxLength(2000)
+  reason!: string;
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  evidenceUrls?: string[];
+}
+
+export enum ResolveDisputeOutcome {
+  BUYER = 'buyer',
+  SELLER = 'seller',
+}
+
+export class ResolveDisputeDto {
+  @ApiProperty({ enum: ResolveDisputeOutcome })
+  @IsEnum(ResolveDisputeOutcome)
+  outcome!: ResolveDisputeOutcome;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  resolutionNotes?: string;
 }

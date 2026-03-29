@@ -12,6 +12,7 @@ import {
   QueueName,
 } from '../queue/queue.constants';
 import { UsersModule } from '../users/users.module';
+import { LedgerModule } from '../ledger/ledger.module';
 import { PaymentIntent } from './entities/payment-intent.entity';
 import { PaymentReconciliationIssue } from './entities/payment-reconciliation-issue.entity';
 import { PaymentReconciliationRun } from './entities/payment-reconciliation-run.entity';
@@ -21,6 +22,8 @@ import { PaymentsController } from './payments.controller';
 import { PaymentsProcessor } from './payments.processor';
 import { PaymentsService } from './payments.service';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
+import { PayoutsModule } from '../payouts/payouts.module';
+import { RefundsModule } from '../refunds/refunds.module';
 
 type QueueConnectionOptions = NonNullable<QueueOptions['connection']>;
 
@@ -36,7 +39,10 @@ type QueueConnectionOptions = NonNullable<QueueOptions['connection']>;
       FulfilmentEvent,
     ]),
     UsersModule,
+    LedgerModule,
     forwardRef(() => SubscriptionsModule),
+    forwardRef(() => PayoutsModule),
+    forwardRef(() => RefundsModule),
   ],
   providers: [
     {

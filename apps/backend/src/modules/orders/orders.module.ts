@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Order } from './entities/order.entity';
 import { OrderItem } from './entities/order-item.entity';
@@ -12,6 +12,8 @@ import { ProductVariant } from '../catalog/entities/product-variant.entity';
 import { MailModule } from '../mail/mail.module';
 import { SellersModule } from '../sellers/sellers.module';
 import { PlatformConfigModule } from '../platform-config/platform-config.module';
+import { LedgerModule } from '../ledger/ledger.module';
+import { RefundsModule } from '../refunds/refunds.module';
 import { Queue, QueueOptions } from 'bullmq';
 import { QueueModule } from '../queue/queue.module';
 import {
@@ -39,6 +41,8 @@ type QueueConnectionOptions = NonNullable<QueueOptions['connection']>;
     ]),
     SellersModule,
     PlatformConfigModule,
+    LedgerModule,
+    forwardRef(() => RefundsModule),
     MailModule,
   ],
   providers: [

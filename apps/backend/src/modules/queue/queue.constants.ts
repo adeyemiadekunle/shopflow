@@ -20,6 +20,7 @@ export enum OrderJobName {
   SEND_BUYER_QUOTE_RESPONSE_REMINDER = 'send-buyer-quote-response-reminder',
   EXPIRE_AWAITING_DELIVERY_QUOTE = 'expire-awaiting-delivery-quote',
   EXPIRE_QUOTE_SENT = 'expire-quote-sent',
+  RELEASE_HELD_ORDER_FUNDS = 'release-held-order-funds',
 }
 
 export enum DeadLetterJobName {

@@ -20,6 +20,7 @@ export enum FulfilmentEventType {
   BUYER_CONFIRMED = 'buyer_confirmed',
   DISPUTE_OPENED = 'dispute_opened',
   DISPUTE_RESOLVED = 'dispute_resolved',
+  FUNDS_RELEASED = 'funds_released',
   REFUNDED = 'refunded',
   CANCELLED = 'cancelled',
 }

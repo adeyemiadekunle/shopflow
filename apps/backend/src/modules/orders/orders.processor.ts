@@ -24,6 +24,7 @@ import {
 } from './entities/fulfilment-event.entity';
 import { Order } from './entities/order.entity';
 import { OrderStatus } from './enums/order-status.enum';
+import { OrdersService } from './orders.service';
 
 type QueueConnectionOptions = {
   host: string;
@@ -68,6 +69,7 @@ export class OrdersProcessor implements OnModuleInit, OnModuleDestroy {
     private readonly deadLetterQueue: Queue,
     private readonly config: ConfigService,
     private readonly mailService: MailService,
+    private readonly ordersService: OrdersService,
   ) {}
 
   private async getOrderForNotification(orderId: string): Promise<Order> {
@@ -243,6 +245,12 @@ export class OrdersProcessor implements OnModuleInit, OnModuleDestroy {
     );
   }
 
+  private async processHeldFundsRelease(
+    job: OrderNotificationJob,
+  ): Promise<void> {
+    await this.ordersService.releaseHeldFundsFromQueue(job.data.orderId);
+  }
+
   private async handleFailedJob(
     job: FailedOrderJob,
     error: Error,
@@ -303,6 +311,9 @@ export class OrdersProcessor implements OnModuleInit, OnModuleDestroy {
             return;
           case OrderJobName.EXPIRE_QUOTE_SENT:
             await this.processQuoteSentExpiry(job);
+            return;
+          case OrderJobName.RELEASE_HELD_ORDER_FUNDS:
+            await this.processHeldFundsRelease(job);
             return;
         }
       },

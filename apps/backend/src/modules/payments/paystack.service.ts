@@ -53,6 +53,38 @@ export interface PaystackResolveAccountResponse {
   bank_id?: number;
 }
 
+export interface PaystackTransferRecipientResponse {
+  recipient_code: string;
+  type: string;
+  name: string;
+  details?: Record<string, unknown>;
+}
+
+export interface PaystackTransferResponse {
+  id?: number;
+  transfer_code?: string;
+  reference: string;
+  status: string;
+  amount: number;
+  currency: string;
+  recipient?: {
+    recipient_code?: string;
+    type?: string;
+    name?: string;
+  };
+}
+
+export interface PaystackRefundResponse {
+  id?: number;
+  transaction?: number | Record<string, unknown>;
+  amount: number;
+  currency: string;
+  status: string;
+  customer_note?: string;
+  merchant_note?: string;
+  reason?: string;
+}
+
 @Injectable()
 export class PaystackService {
   private readonly http: AxiosInstance;
@@ -143,12 +175,72 @@ export class PaystackService {
     return data.data as PaystackResolveAccountResponse;
   }
 
-  async refund(transactionId: string, amountKobo?: number): Promise<unknown> {
+  async createRefund(params: {
+    transaction: string;
+    amountKobo?: number;
+    currency?: string;
+    customerNote?: string;
+    merchantNote?: string;
+  }): Promise<PaystackRefundResponse> {
     const { data } = await this.http.post('/refund', {
-      transaction: transactionId,
-      ...(amountKobo !== undefined && { amount: amountKobo }),
+      transaction: params.transaction,
+      ...(params.amountKobo !== undefined && { amount: params.amountKobo }),
+      ...(params.currency !== undefined && { currency: params.currency }),
+      ...(params.customerNote ? { customer_note: params.customerNote } : {}),
+      ...(params.merchantNote ? { merchant_note: params.merchantNote } : {}),
     });
-    return data.data;
+    return data.data as PaystackRefundResponse;
+  }
+
+  async retryRefundWithCustomerDetails(params: {
+    refundId: number;
+    currency: string;
+    accountNumber: string;
+    bankId: string;
+  }): Promise<PaystackRefundResponse> {
+    const { data } = await this.http.post(
+      `/refund/retry_with_customer_details/${params.refundId}`,
+      {
+        refund_account_details: {
+          currency: params.currency,
+          account_number: params.accountNumber,
+          bank_id: params.bankId,
+        },
+      },
+    );
+    return data.data as PaystackRefundResponse;
+  }
+
+  async createTransferRecipient(params: {
+    name: string;
+    accountNumber: string;
+    bankCode: string;
+    currency: string;
+  }): Promise<PaystackTransferRecipientResponse> {
+    const { data } = await this.http.post('/transferrecipient', {
+      type: 'nuban',
+      name: params.name,
+      account_number: params.accountNumber,
+      bank_code: params.bankCode,
+      currency: params.currency,
+    });
+    return data.data as PaystackTransferRecipientResponse;
+  }
+
+  async initiateTransfer(params: {
+    amountKobo: number;
+    recipientCode: string;
+    reference: string;
+    reason?: string;
+  }): Promise<PaystackTransferResponse> {
+    const { data } = await this.http.post('/transfer', {
+      source: 'balance',
+      amount: params.amountKobo,
+      recipient: params.recipientCode,
+      reference: params.reference,
+      reason: params.reason,
+    });
+    return data.data as PaystackTransferResponse;
   }
 
   async disableSubscription(params: {
