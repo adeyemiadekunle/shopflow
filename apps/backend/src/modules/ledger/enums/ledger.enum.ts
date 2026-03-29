@@ -2,6 +2,7 @@ export enum LedgerEventType {
   PAYMENT_COLLECTED = 'payment_collected',
   PAYMENT_VERIFIED = 'payment_verified',
   FEE_ACCRUED = 'fee_accrued',
+  SUBSCRIPTION_BILLED = 'subscription_billed',
   SELLER_PENDING_ALLOCATED = 'seller_pending_allocated',
   DELIVERY_CONFIRMED = 'delivery_confirmed',
   HOLD_RELEASED = 'hold_released',

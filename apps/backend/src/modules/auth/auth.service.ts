@@ -23,6 +23,7 @@ import {
 import { UserRole } from '../users/enums/user-role.enum';
 import { MailService } from '../mail/mail.service';
 import { SellersService } from '../sellers/sellers.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 
 @Injectable()
 export class AuthService {
@@ -33,6 +34,7 @@ export class AuthService {
     private readonly config: ConfigService,
     private readonly mailService: MailService,
     private readonly sellersService: SellersService,
+    private readonly subscriptionsService: SubscriptionsService,
   ) {}
 
   private async hashValue(value: string): Promise<string> {
@@ -135,11 +137,12 @@ export class AuthService {
     await this.usersService.save(user);
 
     if (role === UserRole.SELLER) {
-      await this.sellersService.createForUser({
+      const sellerProfile = await this.sellersService.createForUser({
         userId: user.id,
         email: user.email,
         storeName: this.buildDefaultStoreName(dto, email),
       });
+      await this.subscriptionsService.startFreeTrial(sellerProfile.id);
     }
 
     try {

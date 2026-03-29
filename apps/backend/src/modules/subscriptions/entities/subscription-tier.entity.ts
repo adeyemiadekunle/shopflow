@@ -61,6 +61,9 @@ export class SubscriptionTier {
   @Column({ name: 'sort_order', default: 0 })
   sortOrder!: number;
 
+  @Column({ name: 'paystack_plan_code', nullable: true, length: 100 })
+  paystackPlanCode?: string;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
 

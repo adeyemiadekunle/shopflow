@@ -273,13 +273,14 @@ Frontend notes:
 
 Immutable double-entry ledger — entries are **never updated or deleted** after creation.
 
-**LedgerEventType** (12 values):
+**LedgerEventType** (13 values):
 
 | Event | Meaning |
 |---|---|
 | `payment_collected` | Buyer payment received into clearing |
 | `payment_verified` | Payment confirmed by Paystack |
 | `fee_accrued` | Platform commission debited |
+| `subscription_billed` | Seller subscription payment recorded as platform cash and revenue |
 | `seller_pending_allocated` | Funds moved to seller pending hold |
 | `delivery_confirmed` | Delivery confirmed, hold ready to release |
 | `hold_released` | Funds released to seller available balance |
@@ -344,10 +345,25 @@ JWT auth via `auth.token` in the Socket.IO handshake.
 | Method | Route | Auth | Description |
 |---|---|---|---|
 | GET | `/tiers` | Public | Active tiers (pricing page) |
+| GET | `/me` | Seller | Current seller subscription and resolved feature flags |
+| POST | `/checkout/:tierId` | Seller | Initialize Paystack checkout for a seller tier |
+| POST | `/verify` | Seller | Verify seller subscription payment by reference |
+| POST | `/cancel` | Seller | Disable recurring billing for the current seller subscription |
 | GET | `/admin/tiers` | Admin | All tiers including inactive |
 | PUT | `/admin/tiers` | Admin | Create or replace a tier |
 | PATCH | `/admin/tiers/:id` | Admin | Update price, currency, features |
+| POST | `/admin/tiers/:id/sync-plan` | Admin | Create and store the Paystack plan code for a paid tier |
 | POST | `/admin/tiers/seed` | Admin | Bootstrap default tiers |
+
+Seller subscription flow:
+
+1. New seller registration automatically starts on the Free tier.
+2. Frontend lists tiers from `GET /api/v1/subscriptions/tiers`.
+3. Seller starts paid checkout with `POST /api/v1/subscriptions/checkout/:tierId`.
+4. Backend returns a Paystack `authorizationUrl`.
+5. Frontend redirects the seller to Paystack Checkout.
+6. After redirect back, frontend calls `POST /api/v1/subscriptions/verify`.
+7. Recurring lifecycle updates are also processed from Paystack webhooks (`subscription.create`, `charge.success`, `invoice.update`, `invoice.payment_failed`, `subscription.disable`).
 
 ### Health — `/health`
 

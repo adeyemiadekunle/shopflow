@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Queue, QueueOptions } from 'bullmq';
 import { FulfilmentEvent } from '../orders/entities/fulfilment-event.entity';
@@ -20,6 +20,7 @@ import { PaystackService } from './paystack.service';
 import { PaymentsController } from './payments.controller';
 import { PaymentsProcessor } from './payments.processor';
 import { PaymentsService } from './payments.service';
+import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 
 type QueueConnectionOptions = NonNullable<QueueOptions['connection']>;
 
@@ -35,6 +36,7 @@ type QueueConnectionOptions = NonNullable<QueueOptions['connection']>;
       FulfilmentEvent,
     ]),
     UsersModule,
+    forwardRef(() => SubscriptionsModule),
   ],
   providers: [
     {

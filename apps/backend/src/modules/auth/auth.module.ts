@@ -11,12 +11,14 @@ import { RolesGuard } from './guards/roles.guard';
 import { UsersModule } from '../users/users.module';
 import { MailModule } from '../mail/mail.module';
 import { SellersModule } from '../sellers/sellers.module';
+import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 
 @Module({
   imports: [
     UsersModule,
     MailModule,
     SellersModule,
+    SubscriptionsModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({}),
   ],
