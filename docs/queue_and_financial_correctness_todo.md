@@ -128,7 +128,8 @@ What is still missing is the production-grade async and correctness layer around
 - [x] Payment intent model exists
 - [x] Webhook event persistence exists
 - [x] Order checkout flow exists
-- [x] Paystack Checkout init and verify endpoints exist
+- [x] Provider-aware checkout init and verify endpoints exist
+- [x] Paystack + Monnify checkout support exists
 - [x] Queue layer started
 - [x] Orders notification queue started
 - [x] Orders reminder and expiry queue started
@@ -137,6 +138,6 @@ What is still missing is the production-grade async and correctness layer around
 - [x] API and payments Grafana dashboard provisioning added
 - [x] Payment reconciliation dashboards added
 - [x] Payment idempotency hardening added
-- [ ] Ledger posting on payment success not connected
+- [x] Ledger posting on payment success connected
 - [ ] Ledger-aware reconciliation not implemented
 - [ ] DLQ and worker monitoring not implemented

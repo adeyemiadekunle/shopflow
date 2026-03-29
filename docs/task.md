@@ -1,54 +1,93 @@
-# Rands NestJS Backend Scaffold
+# Rands Backend Task Tracker
 
-## Phase 1: Foundation
-- [x] Write implementation plan
-- [x] Scaffold NestJS project (`apps/backend/`) via CLI
-- [x] Configure TypeScript strict mode + path aliases
-- [x] Set up ESLint + Prettier
-- [x] Set up `.env` / `ConfigModule` with class-validator
+This file is the current high-level implementation tracker for the backend.
+It replaces the original scaffold-era checklist, which is now outdated.
 
-## Phase 2: Core Infrastructure
-- [x] Database: TypeORM + PostgreSQL setup with migrations
-- [x] Pino structured JSON logging
-- [x] Global exception filter + validation pipe
-- [x] Health check module (`/health`)
-- [x] Swagger / OpenAPI documentation
+Detailed queue and financial-correctness follow-up work lives in:
+- `docs/queue_and_financial_correctness_todo.md`
 
-## Phase 3: Domain Modules (skeleton)
-- [x] `auth` — JWT access + refresh tokens, guards, RBAC decorators
-- [x] `users` — user entity, roles
-- [x] `sellers` — seller profile, KYC status, storefront
-- [x] `catalog` — product, variant, category, media
-- [x] `orders` — order, order-item, delivery-quote, fulfilment-event, dispute
-- [x] `payments` — Paystack integration layer, webhook handler, payment-intent
-- [x] `ledger` — ledger-account, ledger-entry, balance-snapshot
-- [ ] `social` — post, post-product link, comment
-- [ ] `chat` — conversation, message
+Current source of truth for module status lives in:
+- `docs/status_report.md`
 
-## Phase 4: Docker & Observability
-- [/] `Dockerfile` (multi-stage, non-root)
-- [/] `docker-compose.yml` (app, postgres, redis, prometheus, grafana, loki, promtail)
-- [/] `prometheus.yml` scrape config
-- [/] Grafana provisioning (datasources + dashboards)
-- [/] Promtail config
+## Completed Core Modules
 
-## Phase 5: CI/CD & Testing
-- [/] GitHub Actions CI pipeline (lint → test → build → docker)
-- [/] Jest unit tests for LedgerService and OrdersService
-- [/] Makefile with common dev targets
+- [x] `auth`
+- [x] `users`
+- [x] `sellers`
+- [x] `catalog`
+- [x] `media`
+- [x] `feed`
+- [x] `chat`
+- [x] `cart`
+- [x] `addresses`
+- [x] `orders`
+- [x] `payments`
+- [x] `payouts`
+- [x] `refunds`
+- [x] `ledger`
+- [x] `platform-config`
+- [x] `health`
+- [x] `queue`
+- [x] `mail`
 
-## Phase 6: Verification
-- [ ] `npm run build` passes
-- [ ] `npm run test` passes
-- [ ] `docker compose up` starts all services
-- [ ] `/health` and Swagger reachable
+## Completed Platform Foundations
 
-## Phase 7: Queue and Financial Correctness
-- [ ] Add BullMQ + Redis worker foundation
-- [ ] Queue Paystack webhook and payment post-processing
-- [ ] Connect payment success to immutable ledger entries
-- [ ] Add reconciliation jobs for orders, payments, and ledger state
-- [ ] Queue slow order, notification, and external-service side effects
-- [ ] Add retry, DLQ, and queue observability
+- [x] PostgreSQL + TypeORM + migrations
+- [x] Redis + BullMQ foundation
+- [x] Swagger / OpenAPI
+- [x] Health checks
+- [x] Prometheus metrics
+- [x] Grafana dashboards
+- [x] Loki / Promtail log pipeline
+- [x] Docker Compose local stack
+- [x] GitHub Actions CI
+- [x] AWS S3 + CloudFront media upload foundation
+- [x] Paystack + Monnify provider abstraction foundation
 
-See `docs/queue_and_financial_correctness_todo.md` for the detailed implementation tracker.
+## Remaining Work By Theme
+
+### Product / UX
+
+- [ ] Add seller analytics endpoints and dashboard-ready summaries
+- [ ] Add platform/admin analytics endpoints and dashboard-ready summaries
+- [ ] Add richer catalog/feed media polish
+- [ ] Add video-processing pipeline after image-first rollout
+- [ ] Add first-time checkout support for separate raw `billingAddress`
+- [ ] Add moderation / admin tooling for feed, chat, and catalog
+
+### Finance / Operations
+
+- [ ] Finish ledger-aware reconciliation
+- [ ] Add finance reporting derived from ledger state
+- [ ] Add payout and refund operational reporting / exports
+- [ ] Add commission-policy reporting and audit visibility
+
+### Queue / Reliability
+
+- [ ] Add DLQ visibility and replay workflow
+- [ ] Add alerting for queue backlog and stuck jobs
+- [ ] Add retry / failure runbooks
+- [ ] Add more worker-level metrics and dashboards
+- [ ] Add integration tests for duplicate webhook / retry / replay behavior
+- [ ] Add load testing for checkout, webhook, and payout paths
+
+### Notifications
+
+- [ ] Expand beyond email into WhatsApp / SMS / push when ready
+- [ ] Add provider/channel-aware notification preferences
+
+### Documentation / Cleanup
+
+- [ ] Refresh stale counts and examples in README files over time
+- [ ] Remove dead leftover module folders that are no longer wired
+- [ ] Keep `docs/status_report.md` updated at each major milestone
+
+## Suggested Next Order
+
+1. Seller analytics
+2. Platform/admin analytics
+3. Queue and ops hardening
+4. Media/video processing polish
+5. Notification expansion
+6. Final finance and ledger reporting pass
+7. Cleanup and documentation sweep
