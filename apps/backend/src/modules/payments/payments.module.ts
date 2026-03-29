@@ -17,12 +17,14 @@ import { PaymentIntent } from './entities/payment-intent.entity';
 import { PaymentReconciliationIssue } from './entities/payment-reconciliation-issue.entity';
 import { PaymentReconciliationRun } from './entities/payment-reconciliation-run.entity';
 import { WebhookEvent } from './entities/webhook-event.entity';
+import { PlatformConfigModule } from '../platform-config/platform-config.module';
 import { PaystackService } from './paystack.service';
 import { PaymentsController } from './payments.controller';
 import { PaymentsProcessor } from './payments.processor';
 import { PaymentsService } from './payments.service';
 import { PayoutsModule } from '../payouts/payouts.module';
 import { RefundsModule } from '../refunds/refunds.module';
+import { MonnifyService } from './monnify.service';
 
 type QueueConnectionOptions = NonNullable<QueueOptions['connection']>;
 
@@ -39,6 +41,7 @@ type QueueConnectionOptions = NonNullable<QueueOptions['connection']>;
     ]),
     UsersModule,
     LedgerModule,
+    PlatformConfigModule,
     forwardRef(() => PayoutsModule),
     forwardRef(() => RefundsModule),
   ],
@@ -72,10 +75,11 @@ type QueueConnectionOptions = NonNullable<QueueOptions['connection']>;
         }),
     },
     PaystackService,
+    MonnifyService,
     PaymentsService,
     PaymentsProcessor,
   ],
   controllers: [PaymentsController],
-  exports: [PaystackService, PaymentsService],
+  exports: [PaystackService, MonnifyService, PaymentsService],
 })
 export class PaymentsModule {}

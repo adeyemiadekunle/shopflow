@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { Order } from '../../orders/entities/order.entity';
 import { PaymentIntent } from '../../payments/entities/payment-intent.entity';
+import { PaymentProvider } from '../../payments/enums/payment-provider.enum';
 
 export enum RefundStatus {
   PENDING = 'pending',
@@ -40,8 +41,21 @@ export class Refund {
   @Column({ name: 'transaction_reference', length: 100 })
   transactionReference!: string;
 
+  @Column({
+    type: 'enum',
+    enum: PaymentProvider,
+    default: PaymentProvider.PAYSTACK,
+  })
+  provider!: PaymentProvider;
+
   @Column({ name: 'paystack_refund_id', nullable: true })
   paystackRefundId?: string;
+
+  @Column({ name: 'provider_refund_reference', nullable: true })
+  providerRefundReference?: string;
+
+  @Column({ name: 'provider_refund_id', nullable: true })
+  providerRefundId?: string;
 
   @Column({
     name: 'amount',

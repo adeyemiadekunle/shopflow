@@ -8,7 +8,7 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
-    rawBody: true, // needed for Paystack webhook signature verification
+    rawBody: true, // needed for payment-provider webhook signature verification
   });
 
   const config = app.get(ConfigService);
@@ -46,7 +46,7 @@ async function bootstrap() {
       .addTag('sellers', 'Seller storefront and onboarding')
       .addTag('catalog', 'Products and categories')
       .addTag('orders', 'Order lifecycle management')
-      .addTag('payments', 'Paystack payment integration')
+      .addTag('payments', 'Paystack and Monnify payment integration')
       .addTag('health', 'System health checks')
       .build();
     const document = SwaggerModule.createDocument(app, swaggerConfig);

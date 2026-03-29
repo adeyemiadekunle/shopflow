@@ -12,6 +12,7 @@ import {
   PlatformConfigKey,
   PlatformConfigKeyType,
 } from './constants/platform-config.keys';
+import { PaymentProvider } from '../payments/enums/payment-provider.enum';
 
 @Injectable()
 export class PlatformConfigService implements OnModuleInit {
@@ -108,6 +109,35 @@ export class PlatformConfigService implements OnModuleInit {
   async getMinPayoutAmount(): Promise<number> {
     const raw = await this.get(PlatformConfigKey.MIN_PAYOUT_AMOUNT);
     return raw !== undefined ? parseFloat(raw) : 1000;
+  }
+
+  async getSupportedPaymentGateways(): Promise<PaymentProvider[]> {
+    const raw = await this.get(PlatformConfigKey.SUPPORTED_PAYMENT_GATEWAYS);
+    const providers = (raw ?? PaymentProvider.PAYSTACK)
+      .split(',')
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean)
+      .filter(
+        (value): value is PaymentProvider =>
+          value === PaymentProvider.PAYSTACK ||
+          value === PaymentProvider.MONNIFY,
+      );
+
+    return providers.length > 0 ? providers : [PaymentProvider.PAYSTACK];
+  }
+
+  async getDefaultCheckoutProvider(): Promise<PaymentProvider> {
+    const raw = await this.get(PlatformConfigKey.DEFAULT_CHECKOUT_PROVIDER);
+    return raw === PaymentProvider.MONNIFY
+      ? PaymentProvider.MONNIFY
+      : PaymentProvider.PAYSTACK;
+  }
+
+  async getDefaultPayoutProvider(): Promise<PaymentProvider> {
+    const raw = await this.get(PlatformConfigKey.DEFAULT_PAYOUT_PROVIDER);
+    return raw === PaymentProvider.MONNIFY
+      ? PaymentProvider.MONNIFY
+      : PaymentProvider.PAYSTACK;
   }
 
   /**
@@ -211,9 +241,23 @@ export class PlatformConfigService implements OnModuleInit {
       },
       {
         key: PlatformConfigKey.SUPPORTED_PAYMENT_GATEWAYS,
-        value: 'paystack',
+        value: 'paystack,monnify',
         description:
           'Comma-separated payment gateway IDs active on the platform',
+        isPublic: false,
+      },
+      {
+        key: PlatformConfigKey.DEFAULT_CHECKOUT_PROVIDER,
+        value: PaymentProvider.PAYSTACK,
+        description:
+          'Default provider used for buyer checkout initialization',
+        isPublic: false,
+      },
+      {
+        key: PlatformConfigKey.DEFAULT_PAYOUT_PROVIDER,
+        value: PaymentProvider.PAYSTACK,
+        description:
+          'Default provider used for seller payout disbursement',
         isPublic: false,
       },
       {

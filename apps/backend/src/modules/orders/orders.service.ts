@@ -206,6 +206,25 @@ export class OrdersService {
     return Number(order.totalAmount);
   }
 
+  private getCommissionAmount(order: Order): number {
+    const grossAmount = this.getSettlementAmount(order);
+    const rawCommission = Number(order.platformFee ?? 0);
+
+    if (!Number.isFinite(rawCommission) || rawCommission <= 0) {
+      return 0;
+    }
+
+    return Number(Math.min(rawCommission, grossAmount).toFixed(2));
+  }
+
+  private getSellerNetSettlementAmount(order: Order): number {
+    return Number(
+      (this.getSettlementAmount(order) - this.getCommissionAmount(order)).toFixed(
+        2,
+      ),
+    );
+  }
+
   private async ensureSellerSettlementAccounts(order: Order): Promise<void> {
     await Promise.all([
       this.ledgerService.ensureAccount(
@@ -220,6 +239,11 @@ export class OrdersService {
       ),
       this.ledgerService.ensureAccount(
         LedgerAccountType.REFUND_RESERVE,
+        undefined,
+        order.currency,
+      ),
+      this.ledgerService.ensureAccount(
+        LedgerAccountType.PLATFORM_REVENUE,
         undefined,
         order.currency,
       ),
@@ -255,12 +279,15 @@ export class OrdersService {
     actorId: string,
     notes: string,
   ): Promise<void> {
-    const amount = this.getSettlementAmount(order);
-    if (amount <= 0) {
+    const grossAmount = this.getSettlementAmount(order);
+    if (grossAmount <= 0) {
       return;
     }
 
     await this.ensureSellerSettlementAccounts(order);
+
+    const commissionAmount = this.getCommissionAmount(order);
+    const sellerNetAmount = this.getSellerNetSettlementAmount(order);
 
     const reference = `hold-release:${order.id}`;
     const pendingAlreadyMoved = await this.ledgerService.hasRecordedReference({
@@ -273,12 +300,18 @@ export class OrdersService {
       eventType: LedgerEventType.HOLD_RELEASED,
       accountType: LedgerAccountType.SELLER_AVAILABLE,
     });
+    const commissionAlreadyRecorded =
+      await this.ledgerService.hasRecordedReference({
+        reference,
+        eventType: LedgerEventType.FEE_ACCRUED,
+        accountType: LedgerAccountType.PLATFORM_REVENUE,
+      });
 
     if (!pendingAlreadyMoved) {
       await this.ledgerService.record({
         accountType: LedgerAccountType.SELLER_PENDING,
         ownerId: order.sellerProfileId,
-        amount: -amount,
+        amount: -grossAmount,
         currency: order.currency,
         orderId: order.id,
         actorId,
@@ -288,17 +321,30 @@ export class OrdersService {
       });
     }
 
-    if (!availableAlreadyMoved) {
+    if (!availableAlreadyMoved && sellerNetAmount > 0) {
       await this.ledgerService.record({
         accountType: LedgerAccountType.SELLER_AVAILABLE,
         ownerId: order.sellerProfileId,
-        amount,
+        amount: sellerNetAmount,
         currency: order.currency,
         orderId: order.id,
         actorId,
         eventType: LedgerEventType.HOLD_RELEASED,
         reference,
         notes,
+      });
+    }
+
+    if (!commissionAlreadyRecorded && commissionAmount > 0) {
+      await this.ledgerService.record({
+        accountType: LedgerAccountType.PLATFORM_REVENUE,
+        amount: commissionAmount,
+        currency: order.currency,
+        orderId: order.id,
+        actorId,
+        eventType: LedgerEventType.FEE_ACCRUED,
+        reference,
+        notes: `Platform commission accrued for order ${order.orderReference}.`,
       });
     }
   }
@@ -374,7 +420,9 @@ export class OrdersService {
       {
         fundsHeldUntil: order.fundsHeldUntil?.toISOString(),
         releasedAt: new Date().toISOString(),
-        settlementAmount: this.getSettlementAmount(order),
+        grossSettlementAmount: this.getSettlementAmount(order),
+        sellerNetSettlementAmount: this.getSellerNetSettlementAmount(order),
+        commissionAmount: this.getCommissionAmount(order),
       },
     );
 

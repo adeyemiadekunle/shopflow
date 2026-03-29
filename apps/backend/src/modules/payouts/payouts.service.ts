@@ -11,13 +11,16 @@ import {
   LedgerAccountType,
   LedgerEventType,
 } from '../ledger/enums/ledger.enum';
+import { MonnifyService } from '../payments/monnify.service';
 import { PaystackService } from '../payments/paystack.service';
+import { PaymentProvider } from '../payments/enums/payment-provider.enum';
 import { PlatformConfigService } from '../platform-config/platform-config.service';
 import { BankAccount } from '../sellers/entities/bank-account.entity';
 import { SellerProfile } from '../sellers/entities/seller-profile.entity';
 import {
   ApprovePayoutDto,
   CreatePayoutRequestDto,
+  SendBulkPayoutsDto,
   SendPayoutDto,
 } from './dto/admin-payout.dto';
 import { Payout, PayoutStatus } from './entities/payout.entity';
@@ -36,10 +39,15 @@ export class PayoutsService {
     private readonly ledgerService: LedgerService,
     private readonly platformConfigService: PlatformConfigService,
     private readonly paystackService: PaystackService,
+    private readonly monnifyService: MonnifyService,
   ) {}
 
   private generateReference(): string {
     return `PAYOUT-${crypto.randomUUID().slice(0, 8).toUpperCase()}-${Date.now()}`;
+  }
+
+  private generateBatchReference(): string {
+    return `PAYOUT-BATCH-${crypto.randomUUID().slice(0, 8).toUpperCase()}-${Date.now()}`;
   }
 
   private normalizeLimit(limit: number, fallback: number): number {
@@ -218,7 +226,7 @@ export class PayoutsService {
       reference: payout.reference,
       notes:
         notes ??
-        `Payout ${payout.reference} completed successfully through Paystack transfer`,
+        `Payout ${payout.reference} completed successfully through the configured transfer provider`,
     });
   }
 
@@ -340,6 +348,7 @@ export class PayoutsService {
     );
     const minPayoutAmount = await this.platformConfigService.getMinPayoutAmount();
     const currency = this.platformConfigService.getCurrency();
+    const provider = await this.platformConfigService.getDefaultPayoutProvider();
 
     if (amount < minPayoutAmount) {
       throw new BadRequestException(
@@ -360,6 +369,7 @@ export class PayoutsService {
         reference: this.generateReference(),
         amount,
         currency,
+        provider,
         reason: dto.reason?.trim(),
         requestedById: adminId,
         status: PayoutStatus.REQUESTED,
@@ -411,6 +421,51 @@ export class PayoutsService {
       bankAccountId: payout.bankAccountId,
     });
 
+    if (payout.provider === PaymentProvider.MONNIFY) {
+      const transfer = await this.monnifyService.initiateSingleTransfer({
+        amount: this.getAmountNgn(payout),
+        reference: payout.reference,
+        narration: dto.reason?.trim() ?? payout.reason ?? 'Seller payout',
+        destinationBankCode: bankAccount.bankCode!,
+        destinationAccountNumber: bankAccount.accountNumber,
+        currency: payout.currency,
+        async: true,
+      });
+
+      const status = transfer.status.toUpperCase();
+
+      if (status === 'SUCCESS') {
+        await this.settlePayoutSuccess(payout, adminId);
+      }
+
+      if (status === 'FAILED' || status === 'REVERSED') {
+        await this.reverseReservedPayout(
+          payout,
+          adminId,
+          status === 'REVERSED'
+            ? 'Monnify transfer reversed immediately during payout send'
+            : 'Monnify transfer failed immediately during payout send',
+        );
+      }
+
+      return this.payoutRepo.save({
+        ...payout,
+        status:
+          status === 'SUCCESS'
+            ? PayoutStatus.SUCCEEDED
+            : status === 'FAILED'
+              ? PayoutStatus.FAILED
+              : status === 'REVERSED'
+                ? PayoutStatus.REVERSED
+                : PayoutStatus.PROCESSING,
+        providerTransferReference: transfer.reference,
+        providerTransferId: transfer.transactionReference,
+        rawTransferPayload: transfer as unknown as Record<string, unknown>,
+        processedAt: status === 'SUCCESS' ? new Date() : payout.processedAt,
+        failureReason: undefined,
+      });
+    }
+
     let recipientCode = bankAccount.paystackRecipientCode;
     if (!recipientCode) {
       const recipient = await this.paystackService.createTransferRecipient({
@@ -461,11 +516,97 @@ export class PayoutsService {
       paystackTransferCode: transfer.transfer_code,
       paystackTransferId:
         transfer.id !== undefined ? String(transfer.id) : payout.paystackTransferId,
+      providerRecipientReference: recipientCode,
+      providerTransferReference: transfer.transfer_code,
+      providerTransferId:
+        transfer.id !== undefined ? String(transfer.id) : payout.providerTransferId,
       rawTransferPayload: transfer as unknown as Record<string, unknown>,
       processedAt:
         transfer.status === 'success' ? new Date() : payout.processedAt,
       failureReason: undefined,
     });
+  }
+
+  async sendBulkPayouts(adminId: string, dto: SendBulkPayoutsDto) {
+    const payouts = await this.payoutRepo.find({
+      where: dto.payoutIds.map((id) => ({ id })),
+      relations: ['sellerProfile', 'bankAccount'],
+    });
+
+    if (payouts.length !== dto.payoutIds.length) {
+      throw new NotFoundException('One or more payout records were not found');
+    }
+
+    if (payouts.some((payout) => payout.provider !== PaymentProvider.MONNIFY)) {
+      throw new BadRequestException(
+        'Bulk payout send is currently available only for Monnify payout records',
+      );
+    }
+
+    if (payouts.some((payout) => payout.status !== PayoutStatus.APPROVED)) {
+      throw new BadRequestException(
+        'Only approved payouts can be sent in a bulk payout batch',
+      );
+    }
+
+    const batchReference = this.generateBatchReference();
+    const title =
+      dto.title?.trim() || `Seller payout batch ${new Date().toISOString()}`;
+    const narration = dto.narration?.trim() || 'Seller payout batch';
+
+    const transactionList = payouts.map((payout) => {
+      const bankAccount = payout.bankAccount;
+      if (!bankAccount?.isVerified) {
+        throw new BadRequestException(
+          `Payout ${payout.reference} is missing a verified bank account`,
+        );
+      }
+
+      if (!bankAccount.bankCode?.trim()) {
+        throw new BadRequestException(
+          `Payout ${payout.reference} is missing a destination bank code required by Monnify`,
+        );
+      }
+
+      return {
+        amount: this.getAmountNgn(payout),
+        reference: payout.reference,
+        narration:
+          payout.reason?.trim() || narration || `Seller payout ${payout.reference}`,
+        destinationBankCode: bankAccount.bankCode,
+        destinationAccountNumber: bankAccount.accountNumber,
+        currency: payout.currency,
+      };
+    });
+
+    const bulkTransfer = await this.monnifyService.initiateBulkTransfer({
+      title,
+      batchReference,
+      narration,
+      onValidationFailure: dto.onValidationFailure,
+      notificationInterval: dto.notificationInterval,
+      transactionList,
+    });
+
+    const savedPayouts = await Promise.all(
+      payouts.map((payout) =>
+        this.payoutRepo.save({
+          ...payout,
+          status: PayoutStatus.PROCESSING,
+          providerBatchReference: bulkTransfer.batchReference,
+          rawTransferPayload: bulkTransfer as unknown as Record<string, unknown>,
+          failureReason: undefined,
+        }),
+      ),
+    );
+
+    return {
+      batchReference: bulkTransfer.batchReference,
+      title,
+      payoutCount: savedPayouts.length,
+      payouts: savedPayouts,
+      providerResponse: bulkTransfer,
+    };
   }
 
   async processPaystackWebhook(
@@ -552,6 +693,95 @@ export class PayoutsService {
         eventType === 'transfer.failed' ? new Date() : payout.failedAt,
       reversedAt:
         eventType === 'transfer.reversed' ? new Date() : payout.reversedAt,
+    });
+
+    return true;
+  }
+
+  async processMonnifyWebhook(
+    eventType: string,
+    payload: Record<string, unknown>,
+  ): Promise<boolean> {
+    if (
+      eventType !== 'SUCCESSFUL_DISBURSEMENT' &&
+      eventType !== 'FAILED_DISBURSEMENT' &&
+      eventType !== 'REVERSED_DISBURSEMENT'
+    ) {
+      return false;
+    }
+
+    const data =
+      typeof payload['eventData'] === 'object' && payload['eventData'] !== null
+        ? (payload['eventData'] as Record<string, unknown>)
+        : undefined;
+    const reference = this.getString(data, 'reference');
+
+    if (!reference) {
+      return false;
+    }
+
+    const payout = await this.payoutRepo.findOne({
+      where: { reference },
+      relations: ['bankAccount'],
+    });
+
+    if (!payout) {
+      return false;
+    }
+
+    if (eventType === 'SUCCESSFUL_DISBURSEMENT') {
+      if (payout.status !== PayoutStatus.SUCCEEDED) {
+        await this.settlePayoutSuccess(
+          payout,
+          'system',
+          'Monnify transfer completed successfully',
+        );
+        await this.payoutRepo.save({
+          ...payout,
+          status: PayoutStatus.SUCCEEDED,
+          processedAt: new Date(),
+          providerTransferReference:
+            this.getString(data, 'reference') ?? payout.providerTransferReference,
+          providerTransferId:
+            this.getString(data, 'transactionReference') ??
+            payout.providerTransferId,
+          rawTransferPayload: payload,
+          failureReason: undefined,
+        });
+      }
+
+      return true;
+    }
+
+    if (
+      payout.status === PayoutStatus.SUCCEEDED ||
+      payout.status === PayoutStatus.FAILED ||
+      payout.status === PayoutStatus.REVERSED
+    ) {
+      return true;
+    }
+
+    await this.reverseReservedPayout(
+      payout,
+      'system',
+      eventType === 'REVERSED_DISBURSEMENT'
+        ? 'Monnify transfer reversed; seller funds restored'
+        : 'Monnify transfer failed; seller funds restored',
+    );
+
+    await this.payoutRepo.save({
+      ...payout,
+      status:
+        eventType === 'REVERSED_DISBURSEMENT'
+          ? PayoutStatus.REVERSED
+          : PayoutStatus.FAILED,
+      rawTransferPayload: payload,
+      failureReason:
+        this.getString(data, 'transactionDescription') ?? payout.failureReason,
+      failedAt:
+        eventType === 'FAILED_DISBURSEMENT' ? new Date() : payout.failedAt,
+      reversedAt:
+        eventType === 'REVERSED_DISBURSEMENT' ? new Date() : payout.reversedAt,
     });
 
     return true;

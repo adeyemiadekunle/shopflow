@@ -17,6 +17,7 @@ import {
   PaymentIntent,
   PaymentIntentStatus,
 } from '../payments/entities/payment-intent.entity';
+import { MonnifyService } from '../payments/monnify.service';
 import { PaystackService } from '../payments/paystack.service';
 import { Refund, RefundStatus } from './entities/refund.entity';
 import { RefundsService } from './refunds.service';
@@ -80,6 +81,11 @@ describe('RefundsService', () => {
   const mockPaystackService = {
     createRefund: jest.fn(),
     retryRefundWithCustomerDetails: jest.fn(),
+  };
+
+  const mockMonnifyService = {
+    createRefund: jest.fn(),
+    getRefundStatus: jest.fn(),
   };
 
   const baseOrder: Order = {
@@ -150,6 +156,7 @@ describe('RefundsService', () => {
         },
         { provide: LedgerService, useValue: mockLedgerService },
         { provide: PaystackService, useValue: mockPaystackService },
+        { provide: MonnifyService, useValue: mockMonnifyService },
       ],
     }).compile();
 
@@ -207,6 +214,41 @@ describe('RefundsService', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
+  it('createRefund() should support Monnify refund initiation for Monnify payments', async () => {
+    mockPaymentIntentRepo.findOne.mockResolvedValueOnce({
+      ...basePaymentIntent,
+      provider: 'monnify',
+      providerPaymentReference: 'MNFY_PAY_1',
+    });
+    mockMonnifyService.createRefund.mockResolvedValue({
+      refundReference: 'MNFY_REF_1',
+      transactionReference: 'PAY-RND-001-TEST',
+      refundReason: 'Approved before seller payout',
+      customerNote: 'Refund approved',
+      refundAmount: 10500,
+      refundStatus: 'PENDING',
+    });
+
+    const refund = await service.createRefund('admin-1', {
+      orderId: 'order-1',
+      reason: 'Approved before seller payout',
+      customerNote: 'Refund approved',
+      destinationAccountNumber: '0123456789',
+      destinationBankCode: '050',
+    });
+
+    expect(mockMonnifyService.createRefund).toHaveBeenCalledWith(
+      expect.objectContaining({
+        transactionReference: 'PAY-RND-001-TEST',
+        refundAmount: 10500,
+        destinationAccountNumber: '0123456789',
+        destinationAccountBankCode: '050',
+      }),
+    );
+    expect(refund.provider).toBe('monnify');
+    expect(refund.providerRefundReference).toBe('MNFY_REF_1');
+  });
+
   it('retryRefundWithBuyerDetails() should send buyer account details to Paystack', async () => {
     mockRefundRepo.findOne.mockResolvedValueOnce({
       id: 'refund-1',
@@ -244,6 +286,61 @@ describe('RefundsService', () => {
       bankId: '011',
     });
     expect(refund.status).toBe(RefundStatus.PROCESSING);
+  });
+
+  it('retryRefundWithBuyerDetails() should re-initiate a Monnify refund when the prior attempt failed', async () => {
+    mockRefundRepo.findOne.mockResolvedValueOnce({
+      id: 'refund-monnify-retry-1',
+      orderId: 'order-1',
+      order: baseOrder,
+      paymentIntentId: 'payment-1',
+      amount: 10500,
+      currency: 'NGN',
+      status: RefundStatus.FAILED,
+      provider: 'monnify',
+      providerRefundReference: 'MNFY_REF_OLD',
+      transactionReference: 'PAY-RND-001-TEST',
+      reason: 'Retry Monnify refund',
+      merchantNote: 'Retry Monnify refund',
+    });
+    mockMonnifyService.getRefundStatus.mockResolvedValue({
+      refundReference: 'MNFY_REF_OLD',
+      transactionReference: 'PAY-RND-001-TEST',
+      refundStatus: 'FAILED',
+      refundAmount: 10500,
+      refundReason: 'Retry Monnify refund',
+    });
+    mockMonnifyService.createRefund.mockResolvedValue({
+      refundReference: 'MNFY_REF_NEW',
+      transactionReference: 'PAY-RND-001-TEST',
+      refundStatus: 'PENDING',
+      refundAmount: 10500,
+      refundReason: 'Retry Monnify refund',
+    });
+
+    const refund = await service.retryRefundWithBuyerDetails(
+      'refund-monnify-retry-1',
+      'admin-1',
+      {
+        bankId: '050',
+        accountNumber: '0123456789',
+        currency: 'NGN',
+        accountName: 'Buyer One',
+      },
+    );
+
+    expect(mockMonnifyService.getRefundStatus).toHaveBeenCalledWith(
+      'MNFY_REF_OLD',
+    );
+    expect(mockMonnifyService.createRefund).toHaveBeenCalledWith(
+      expect.objectContaining({
+        transactionReference: 'PAY-RND-001-TEST',
+        destinationAccountNumber: '0123456789',
+        destinationAccountBankCode: '050',
+      }),
+    );
+    expect(refund.providerRefundReference).toBe('MNFY_REF_NEW');
+    expect(refund.status).toBe(RefundStatus.PENDING);
   });
 
   it('processPaystackWebhook() should finalize processed refunds', async () => {
@@ -322,6 +419,53 @@ describe('RefundsService', () => {
         data: { id: 999 },
       }),
     ).resolves.toBe(false);
+  });
+
+  it('processMonnifyWebhook() should finalize processed Monnify refunds', async () => {
+    mockRefundRepo.findOne.mockResolvedValueOnce({
+      id: 'refund-monnify-1',
+      orderId: 'order-1',
+      paymentIntentId: 'payment-1',
+      transactionReference: 'PAY-RND-001-TEST',
+      providerRefundReference: 'MNFY_REF_1',
+      amount: 10500,
+      currency: 'NGN',
+      status: RefundStatus.PROCESSING,
+      provider: 'monnify',
+    });
+    mockOrderRepo.findOne.mockResolvedValueOnce(baseOrder);
+    mockPaymentIntentRepo.findOne.mockResolvedValueOnce({
+      ...basePaymentIntent,
+      provider: 'monnify',
+    });
+    mockDisputeRepo.findOne.mockResolvedValueOnce({
+      id: 'dispute-1',
+      orderId: 'order-1',
+      status: DisputeStatus.RESOLVED_BUYER,
+    });
+
+    const handled = await service.processMonnifyWebhook('SUCCESSFUL_REFUND', {
+      eventType: 'SUCCESSFUL_REFUND',
+      eventData: {
+        refundReference: 'MNFY_REF_1',
+        transactionReference: 'PAY-RND-001-TEST',
+        refundStatus: 'COMPLETED',
+      },
+    });
+
+    expect(handled).toBe(true);
+    expect(mockPaymentIntentRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'payment-1',
+        status: PaymentIntentStatus.REFUNDED,
+      }),
+    );
+    expect(mockOrderRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'order-1',
+        status: OrderStatus.REFUNDED,
+      }),
+    );
   });
 
   it('createRefund() should throw when there is no successful payment intent', async () => {

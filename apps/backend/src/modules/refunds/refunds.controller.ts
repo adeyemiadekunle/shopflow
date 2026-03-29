@@ -33,7 +33,7 @@ export class RefundsController {
   @Roles(UserRole.ADMIN)
   @ApiOperation({
     summary:
-      'Initiate a Paystack refund for an order whose seller funds are still unreleased',
+      'Initiate a provider-aware refund for an order whose seller funds are still unreleased',
   })
   createRefund(
     @CurrentUser() user: AuthenticatedUser,
@@ -46,7 +46,7 @@ export class RefundsController {
   @Roles(UserRole.ADMIN)
   @ApiOperation({
     summary:
-      'Retry a needs-attention refund with buyer bank details required by Paystack',
+      'Retry a refund using provider-specific recovery logic and optional buyer bank details',
   })
   retryRefund(
     @CurrentUser() user: AuthenticatedUser,

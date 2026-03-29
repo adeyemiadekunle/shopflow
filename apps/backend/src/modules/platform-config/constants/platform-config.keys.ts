@@ -18,6 +18,10 @@ export const PlatformConfigKey = {
   // ─── Payment ───────────────────────────────────────────────────
   /** Comma-separated supported payment gateway IDs (e.g. "paystack") */
   SUPPORTED_PAYMENT_GATEWAYS: 'platform.supported_payment_gateways',
+  /** Default buyer checkout provider (e.g. "paystack" or "monnify") */
+  DEFAULT_CHECKOUT_PROVIDER: 'payments.checkout.default_provider',
+  /** Default seller payout provider (e.g. "paystack" or "monnify") */
+  DEFAULT_PAYOUT_PROVIDER: 'payouts.default_provider',
 
   // ─── Support ───────────────────────────────────────────────────
   /** Support email address */

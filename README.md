@@ -53,7 +53,7 @@ Key design principles:
 | Database | PostgreSQL 16 + TypeORM |
 | Cache / Queues | Redis + BullMQ |
 | Auth | JWT (access + refresh), bcrypt |
-| Payments | Paystack (init, verify, refund, webhooks) |
+| Payments | Paystack + Monnify (checkout, refunds, payouts, webhooks) |
 | Logging | nestjs-pino (structured JSON) |
 | Metrics | Prometheus + Grafana |
 | Log aggregation | Loki + Promtail |
@@ -119,12 +119,23 @@ See [`apps/backend/.env.example`](apps/backend/.env.example) for the full list. 
 | `MEDIA_ALLOW_VIDEO_UPLOADS` | Enable video uploads after the image-first rollout is stable |
 | `PAYSTACK_SECRET_KEY` | Paystack secret key (from dashboard) |
 | `PAYSTACK_WEBHOOK_SECRET` | HMAC secret for webhook verification |
+| `MONNIFY_API_KEY` / `MONNIFY_SECRET_KEY` | Monnify API credentials |
+| `MONNIFY_CONTRACT_CODE` | Monnify contract code used for checkout |
+| `MONNIFY_WALLET_ACCOUNT_NUMBER` | Monnify source wallet/account for payouts |
+| `MONNIFY_BASE_URL` | Monnify API base URL |
 | `PLATFORM_CURRENCY` | ISO 4217 currency code for this deployment (e.g. `NGN`, `GHS`) |
 | `PLATFORM_COUNTRY_CODE` | ISO 3166-1 alpha-2 country code (e.g. `NG`, `GH`) |
 | `PLATFORM_MARKET_NAME` | Human-readable market name (e.g. `Nigeria`) |
 | `PLATFORM_NAME` | Platform display name (e.g. `Rands`) |
 
 > **Note:** `PLATFORM_*` variables are set **once at deploy time** and must never be changed on a live database with existing financial records. See [Platform Config](#platform-config) for details.
+
+Provider routing rules:
+
+- admin sets buyer checkout default with `payments.checkout.default_provider`
+- admin sets seller payout default with `payouts.default_provider`
+- each payment, payout, and refund stores the provider actually used
+- refunds must use the same provider as the original payment
 
 ---
 
@@ -252,7 +263,8 @@ Settlement rule:
 
 ### Payments — `/api/v1/payments`
 
-- Paystack payment initialisation and verification
+- Provider-aware payment initialisation and verification
+- Monnify payment initialisation and verification
 - Webhook handling with HMAC signature verification
 - Raw webhook events stored in `webhook_events` for deduplication and replay
 - Idempotency keys on payment intents
@@ -261,16 +273,17 @@ Current payment routes:
 
 | Method | Route | Auth | Description |
 |---|---|---|---|
-| POST | `/payments/checkout/:orderId` | Buyer | Initialize Paystack Checkout and return `authorizationUrl` |
-| POST | `/payments/verify` | Buyer/Admin | Verify a Paystack transaction by reference |
+| POST | `/payments/checkout/:orderId` | Buyer | Initialize checkout with the configured provider and return `authorizationUrl` |
+| POST | `/payments/verify` | Buyer/Admin | Verify a transaction by reference using the original provider |
 | POST | `/payments/reconciliation/run` | Admin | Queue an immediate payment reconciliation run |
 | GET | `/payments/reconciliation/runs` | Admin | List recent payment reconciliation runs |
 | GET | `/payments/reconciliation/issues` | Admin | List recent payment reconciliation issues |
-| POST | `/payments/webhook` | Public | Paystack webhook receiver |
+| POST | `/payments/webhook` | Public | Paystack webhook receiver (backward-compatible route) |
+| POST | `/payments/webhook/monnify` | Public | Monnify webhook receiver |
 
 ### Payouts — `/api/v1/payouts`
 
-Admin-managed seller payouts from `seller_available` through Paystack Transfers.
+Admin-managed seller payouts from `seller_available` through the configured payout provider.
 
 | Method | Route | Auth | Description |
 |---|---|---|---|
@@ -278,24 +291,26 @@ Admin-managed seller payouts from `seller_available` through Paystack Transfers.
 | GET | `/payouts/admin/sellers/:sellerProfileId/summary` | Admin | Get seller balances, primary bank account, and recent payouts |
 | POST | `/payouts/admin` | Admin | Create a payout request for a seller |
 | POST | `/payouts/admin/:id/approve` | Admin | Reserve seller available balance into payout payable |
-| POST | `/payouts/admin/:id/send` | Admin | Send an approved payout through Paystack Transfers |
+| POST | `/payouts/admin/:id/send` | Admin | Send an approved payout through the configured payout provider |
+| POST | `/payouts/admin/send-bulk` | Admin | Send multiple approved Monnify payouts in one batch |
 
 ### Refunds â€” `/api/v1/refunds`
 
-Admin-managed refunds tied to the original Paystack transaction while seller funds are still unreleased.
+Admin-managed refunds tied to the original payment provider transaction while seller funds are still unreleased.
 
 | Method | Route | Auth | Description |
 |---|---|---|---|
 | GET | `/refunds/admin` | Admin | List recent refund records |
 | POST | `/refunds/admin` | Admin | Initiate a refund for an eligible paid order |
-| POST | `/refunds/admin/:id/retry` | Admin | Retry a `needs_attention` refund with buyer bank details |
+| POST | `/refunds/admin/:id/retry` | Admin | Retry a refund with provider-specific recovery logic and optional buyer bank details |
 
 Refund rules:
 
 - Refunds currently only run before seller funds are released.
 - Refund initiation moves money from `seller_pending` into `refund_reserve`.
-- The order stays `refund_pending` until Paystack confirms `refund.processed`.
-- If Paystack requests buyer bank details, admin can retry with bank id, account number, and currency.
+- The order stays `refund_pending` until the original provider confirms refund completion.
+- Buyer bank details can be supplied on retry when the active provider needs destination details.
+- Monnify refunds can optionally include destination account details at initiation time.
 
 ### Cart — `/api/v1/cart`
 
@@ -345,9 +360,9 @@ Recommended frontend implementation:
 5. Seller sends the delivery quote with `POST /api/v1/orders/:id/quote`.
 6. Buyer accepts the quote with `POST /api/v1/orders/:id/quote-response`.
 7. Frontend calls `POST /api/v1/payments/checkout/:orderId` with the buyer access token.
-8. Backend returns `authorizationUrl`, `reference`, and `accessCode`.
+8. Backend returns `authorizationUrl`, `reference`, and provider-specific extras such as `accessCode` or `paymentReference`.
 9. Frontend redirects the buyer to `authorizationUrl`.
-10. After Paystack returns to the frontend, call `POST /api/v1/payments/verify` with the `reference`.
+10. After the provider returns to the frontend, call `POST /api/v1/payments/verify` with the `reference`.
 11. Seller progresses the order with `/prepare`, `/ship`, and `/deliver`.
 12. Frontend refreshes the order with `GET /api/v1/orders/:id`.
 13. Seller funds remain on hold until the return-policy window passes or any dispute is resolved.
@@ -373,8 +388,9 @@ Example verify request:
 Frontend notes:
 
 - Send the buyer JWT as `Authorization: Bearer <accessToken>` for order and payment calls.
-- The backend, not the frontend, talks to Paystack.
+- The backend, not the frontend, talks to the payment provider.
 - Webhooks remain the source of truth for final payment confirmation; the verify endpoint is for immediate UI refresh after redirect.
+- Payment verify responses now include `provider` and `providerResponse`; the legacy `paystack` field remains for backward compatibility.
 
 ### Frontend Media Upload Flow
 
@@ -445,7 +461,7 @@ Immutable double-entry ledger — entries are **never updated or deleted** after
 | Event | Meaning |
 |---|---|
 | `payment_collected` | Buyer payment received into clearing |
-| `payment_verified` | Payment confirmed by Paystack |
+| `payment_verified` | Payment confirmed by the original provider |
 | `fee_accrued` | Platform commission debited |
 | `subscription_billed` | Seller subscription payment recorded as platform cash and revenue |
 | `seller_pending_allocated` | Funds moved to seller pending hold |
@@ -455,7 +471,7 @@ Immutable double-entry ledger — entries are **never updated or deleted** after
 | `refund_completed` | Refund disbursed to buyer |
 | `payout_requested` | Seller requests payout |
 | `payout_approved` | Admin approves payout |
-| `payout_sent` | Payout dispatched via Paystack |
+| `payout_sent` | Payout dispatched via the configured payout provider |
 | `payout_reversed` | Payout reversed / failed |
 
 **LedgerAccountType** (7 values): `platform_cash_clearing`, `seller_pending`, `seller_available`, `platform_revenue`, `payment_fee_reserve`, `refund_reserve`, `payout_payable`.
@@ -580,7 +596,9 @@ Safe to change at any time — they apply to future records only.
 | `platform.commission_rate_default_percent` | `10` | Default commission % |
 | `platform.return_policy_days` | `7` | Return window in days |
 | `platform.min_payout_amount` | `1000` | Minimum payout amount |
-| `platform.supported_payment_gateways` | `paystack` | Active payment gateways |
+| `platform.supported_payment_gateways` | `paystack,monnify` | Active payment gateways |
+| `payments.checkout.default_provider` | `paystack` | Default buyer checkout provider |
+| `payouts.default_provider` | `paystack` | Default seller payout provider |
 | `platform.support_email` | `support@rands.ng` | Support contact |
 | `features.feed.enabled` | `true` | Platform-wide seller feed posting toggle |
 | `features.chat.enabled` | `true` | Platform-wide buyer-seller chat toggle |
@@ -688,7 +706,7 @@ apps/backend/src/
 │   ├── health/           # Health checks (Terminus)
 │   ├── ledger/           # Immutable double-entry ledger
 │   ├── orders/           # 14-state order machine
-│   ├── payments/         # Paystack integration + webhooks
+│   ├── payments/         # Paystack + Monnify integration + webhooks
 │   ├── platform-config/  # Admin-managed platform settings
 │   ├── sellers/          # Seller profiles, KYC, bank accounts
 │   └── users/            # User accounts + roles

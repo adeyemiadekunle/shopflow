@@ -60,12 +60,23 @@ Copy `.env.example` to `.env` and fill in:
 | `MEDIA_ALLOW_VIDEO_UPLOADS` | Enable video uploads after the image-first rollout is stable |
 | `PAYSTACK_SECRET_KEY` | Paystack API secret |
 | `PAYSTACK_WEBHOOK_SECRET` | Webhook HMAC secret |
+| `MONNIFY_API_KEY` / `MONNIFY_SECRET_KEY` | Monnify API credentials |
+| `MONNIFY_CONTRACT_CODE` | Monnify contract code used for checkout |
+| `MONNIFY_WALLET_ACCOUNT_NUMBER` | Monnify source wallet/account for payouts |
+| `MONNIFY_BASE_URL` | Monnify API base URL |
 | `PLATFORM_CURRENCY` | ISO 4217 code for this deployment (e.g. `NGN`) |
 | `PLATFORM_COUNTRY_CODE` | ISO 3166-1 alpha-2 (e.g. `NG`) |
 | `PLATFORM_MARKET_NAME` | Market name (e.g. `Nigeria`) |
 | `PLATFORM_NAME` | Platform display name (e.g. `Rands`) |
 
 > `PLATFORM_*` vars are set once at deploy time and must not be changed on a live database. Business-rule settings (commission rate, return policy, etc.) remain configurable via the Admin API.
+
+Provider routing rules:
+
+- admin sets buyer checkout default with `payments.checkout.default_provider`
+- admin sets seller payout default with `payouts.default_provider`
+- each payment, payout, and refund stores the provider actually used
+- refunds must use the same provider as the original payment
 
 Feature rollout model:
 
@@ -83,9 +94,9 @@ Feature rollout model:
 | catalog | `/catalog` | Products, variants, media, categories, discounts |
 | media | `/media` | Presigned S3 upload URLs for seller catalog/feed media with CloudFront delivery |
 | orders | `/orders` | Buyer order creation, seller quoting, delivery progression, disputes, and scoped order access |
-| payments | `/payments` | Paystack Checkout init, verify, webhook handling, and admin reconciliation reporting |
+| payments | `/payments` | Provider-configurable checkout init, verify, webhook handling, and admin reconciliation reporting |
 | payouts | `/payouts` | Admin-managed seller payout requests, approvals, sends, and payout summaries |
-| refunds | `/refunds` | Admin-managed refunds, Paystack refund retries, and refund state tracking |
+| refunds | `/refunds` | Admin-managed refunds and provider-aware refund state tracking |
 | cart | `/cart` | Buyer cart grouped by seller with seller-scoped checkout |
 | addresses | `/addresses` | Buyer saved delivery/billing address book with defaults |
 | ledger | `/ledger` | Immutable double-entry ledger (12 event types, 7 account types); atomic `record()` with pessimistic lock; currency from platform config |
@@ -116,9 +127,9 @@ Recommended buyer checkout flow:
    You can pass saved `deliveryAddressId`, `billingAddressId`, or use the same delivery address for billing.
 5. Wait for the seller to send a quote with `POST /api/v1/orders/:id/quote`.
 6. Accept the quote with `POST /api/v1/orders/:id/quote-response`.
-7. Initialize Paystack Checkout with `POST /api/v1/payments/checkout/:orderId`.
+7. Initialize checkout with `POST /api/v1/payments/checkout/:orderId`.
 8. Redirect the browser to the returned `authorizationUrl`.
-9. After redirect back from Paystack, call `POST /api/v1/payments/verify`.
+9. After redirect back from the active provider, call `POST /api/v1/payments/verify`.
 10. Sellers progress fulfilment with `POST /api/v1/orders/:id/prepare`, `/ship`, and `/deliver`.
 11. Buyers can confirm delivery with `POST /api/v1/orders/:id/confirm-delivery` or raise a dispute with `POST /api/v1/orders/:id/disputes`.
 12. Refresh the order from `GET /api/v1/orders/:id`.
@@ -145,9 +156,11 @@ Important frontend rules:
 
 - Always send the buyer access token in `Authorization: Bearer <accessToken>`.
 - Use the returned `authorizationUrl` for redirect-based checkout.
-- Treat the webhook-driven backend update as the final payment truth; the verify endpoint is mainly for immediate UI refresh after Paystack redirects back.
+- Treat the webhook-driven backend update as the final payment truth; the verify endpoint is mainly for immediate UI refresh after redirect back from the active provider.
+- For Monnify-backed checkouts the response can also include a `paymentReference` alongside the main `reference`.
+- Payment verify responses now include `provider` and `providerResponse`; the legacy `paystack` field remains for backward compatibility.
 - Order funds stay in `seller_pending` after payment and only move to `seller_available` after the return-policy hold window expires without an open dispute.
-- Buyer-favour dispute resolution now puts the order into `refund_pending` until Paystack confirms the refund is processed.
+- Buyer-favour dispute resolution now puts the order into `refund_pending` until the original payment provider confirms the refund is processed.
 
 Recommended media upload flow:
 
@@ -163,23 +176,28 @@ Recommended media upload flow:
 2. Create a payout request with `POST /api/v1/payouts/admin`.
 3. Approve it with `POST /api/v1/payouts/admin/:id/approve`.
 4. Send it with `POST /api/v1/payouts/admin/:id/send`.
-5. Let Paystack transfer webhooks finalize success or restore seller funds on failure or reversal.
+5. For Monnify payout batches, use `POST /api/v1/payouts/admin/send-bulk`.
+6. Let the configured payout provider finalize success or restore seller funds on failure or reversal.
 
 Important payout rules:
 
 - Only `seller_available` funds are eligible for payout.
 - The seller bank account must already be verified.
 - Failed or reversed transfers restore funds from `payout_payable` back to `seller_available`.
+- Paystack and Monnify are supported payout providers.
+- Monnify supports both single-transfer sends and bulk payout batches.
 
 ## Admin Refund Flow
 
 1. Review eligible paid orders whose seller funds are still unreleased.
 2. Start a refund with `POST /api/v1/refunds/admin`.
-3. If Paystack returns `needs_attention`, retry with `POST /api/v1/refunds/admin/:id/retry`.
-4. Let Paystack refund webhooks finalize the refund and move the order from `refund_pending` to `refunded`.
+3. If the provider requires recovery action or a retry, use `POST /api/v1/refunds/admin/:id/retry`.
+4. Let the original payment provider finalize the refund and move the order from `refund_pending` to `refunded`.
 
 Important refund rules:
 
 - Refunds are currently limited to orders whose seller funds have not been released.
 - Refund initiation moves funds from `seller_pending` into `refund_reserve`.
-- Buyer bank details are only needed when Paystack asks for them on retry.
+- Buyer bank details are accepted on retry when the active provider needs destination details.
+- Paystack and Monnify refund execution are supported.
+- Monnify refunds can optionally include destination account details when the provider requires them.

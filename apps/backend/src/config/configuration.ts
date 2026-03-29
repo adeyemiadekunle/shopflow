@@ -61,6 +61,13 @@ export default () => ({
     webhookSecret: process.env['PAYSTACK_WEBHOOK_SECRET'] ?? '',
     baseUrl: process.env['PAYSTACK_BASE_URL'] ?? 'https://api.paystack.co',
   },
+  monnify: {
+    apiKey: process.env['MONNIFY_API_KEY'] ?? '',
+    secretKey: process.env['MONNIFY_SECRET_KEY'] ?? '',
+    contractCode: process.env['MONNIFY_CONTRACT_CODE'] ?? '',
+    walletAccountNumber: process.env['MONNIFY_WALLET_ACCOUNT_NUMBER'] ?? '',
+    baseUrl: process.env['MONNIFY_BASE_URL'] ?? 'https://api.monnify.com',
+  },
   throttle: {
     ttl: parseInt(process.env['THROTTLE_TTL'] ?? '60', 10),
     limit: parseInt(process.env['THROTTLE_LIMIT'] ?? '100', 10),

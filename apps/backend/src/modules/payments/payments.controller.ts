@@ -18,6 +18,8 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { UserRole } from '../users/enums/user-role.enum';
 import { InitializeCheckoutDto, VerifyPaymentDto } from './dto/payments.dto';
+import { MonnifyService } from './monnify.service';
+import { PaymentProvider } from './enums/payment-provider.enum';
 import { PaymentsService } from './payments.service';
 import { PaystackService } from './paystack.service';
 import { Request } from 'express';
@@ -34,12 +36,13 @@ export class PaymentsController {
   constructor(
     private readonly paymentsService: PaymentsService,
     private readonly paystackService: PaystackService,
+    private readonly monnifyService: MonnifyService,
   ) {}
 
   @Post('checkout/:orderId')
   @Roles(UserRole.BUYER)
   @ApiOperation({
-    summary: 'Initialize a Paystack Checkout transaction for an order',
+    summary: 'Initialize a checkout transaction for an order using the configured default provider',
   })
   initializeCheckout(
     @CurrentUser() user: AuthenticatedUser,
@@ -51,7 +54,7 @@ export class PaymentsController {
 
   @Post('verify')
   @Roles(UserRole.BUYER, UserRole.ADMIN)
-  @ApiOperation({ summary: 'Verify a Paystack transaction by reference' })
+  @ApiOperation({ summary: 'Verify a payment transaction by reference' })
   verifyCheckout(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: VerifyPaymentDto,
@@ -92,7 +95,7 @@ export class PaymentsController {
   @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Paystack webhook receiver' })
-  async handleWebhook(
+  async handlePaystackWebhook(
     @Req() req: RequestWithRawBody,
     @Headers('x-paystack-signature') signature: string,
     @Body() body: Record<string, unknown>,
@@ -102,10 +105,31 @@ export class PaymentsController {
       !rawBody ||
       !this.paystackService.verifyWebhookSignature(rawBody, signature)
     ) {
-      this.logger.warn('Rejected webhook - invalid signature');
+      this.logger.warn('Rejected Paystack webhook - invalid signature');
       return { received: false };
     }
 
-    return this.paymentsService.enqueueWebhook(body);
+    return this.paymentsService.enqueueWebhook(PaymentProvider.PAYSTACK, body);
+  }
+
+  @Post('webhook/monnify')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Monnify webhook receiver' })
+  async handleMonnifyWebhook(
+    @Req() req: RequestWithRawBody,
+    @Headers('monnify-signature') signature: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    const rawBody = req.rawBody;
+    if (
+      !rawBody ||
+      !this.monnifyService.verifyWebhookSignature(rawBody, signature)
+    ) {
+      this.logger.warn('Rejected Monnify webhook - invalid signature');
+      return { received: false };
+    }
+
+    return this.paymentsService.enqueueWebhook(PaymentProvider.MONNIFY, body);
   }
 }

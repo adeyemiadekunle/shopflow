@@ -10,6 +10,7 @@ import { LedgerService } from '../ledger/ledger.service';
 import { FulfilmentEvent } from '../orders/entities/fulfilment-event.entity';
 import { Order } from '../orders/entities/order.entity';
 import { OrderStatus } from '../orders/enums/order-status.enum';
+import { PlatformConfigService } from '../platform-config/platform-config.service';
 import { PAYMENTS_QUEUE } from '../queue/queue.constants';
 import { PayoutsService } from '../payouts/payouts.service';
 import { RefundsService } from '../refunds/refunds.service';
@@ -29,6 +30,7 @@ import {
   PaymentReconciliationRunStatus,
 } from './entities/payment-reconciliation-run.entity';
 import { WebhookEvent } from './entities/webhook-event.entity';
+import { MonnifyService } from './monnify.service';
 import { PaymentsService } from './payments.service';
 import { PaystackService } from './paystack.service';
 
@@ -108,6 +110,11 @@ describe('PaymentsService', () => {
     verifyTransaction: jest.fn(),
   };
 
+  const mockMonnifyService = {
+    initializeTransaction: jest.fn(),
+    getTransactionStatus: jest.fn(),
+  };
+
   const mockPaymentsQueue = {
     add: jest.fn(),
   };
@@ -124,10 +131,12 @@ describe('PaymentsService', () => {
 
   const mockPayoutsService = {
     processPaystackWebhook: jest.fn(),
+    processMonnifyWebhook: jest.fn(),
   };
 
   const mockRefundsService = {
     processPaystackWebhook: jest.fn(),
+    processMonnifyWebhook: jest.fn(),
   };
 
   const mockConfigService = {
@@ -143,6 +152,12 @@ describe('PaymentsService', () => {
           return undefined;
       }
     }),
+  };
+
+  const mockPlatformConfigService = {
+    getSupportedPaymentGateways: jest.fn().mockResolvedValue(['paystack', 'monnify']),
+    getDefaultCheckoutProvider: jest.fn().mockResolvedValue('paystack'),
+    getDefaultCommissionRate: jest.fn().mockResolvedValue(10),
   };
 
   beforeEach(async () => {
@@ -179,8 +194,10 @@ describe('PaymentsService', () => {
         { provide: PAYMENTS_QUEUE, useValue: mockPaymentsQueue },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: PaystackService, useValue: mockPaystackService },
+        { provide: MonnifyService, useValue: mockMonnifyService },
         { provide: UsersService, useValue: mockUsersService },
         { provide: LedgerService, useValue: mockLedgerService },
+        { provide: PlatformConfigService, useValue: mockPlatformConfigService },
         {
           provide: PayoutsService,
           useValue: mockPayoutsService,
@@ -264,6 +281,60 @@ describe('PaymentsService', () => {
     ).rejects.toThrow(ForbiddenException);
   });
 
+  it('initializeCheckout() should create a Monnify checkout when the admin default provider is monnify', async () => {
+    mockPlatformConfigService.getDefaultCheckoutProvider.mockResolvedValueOnce(
+      'monnify',
+    );
+    mockOrderRepo.findOne.mockResolvedValue({
+      id: 'order-1',
+      orderReference: 'RND-100',
+      buyerId: 'buyer-1',
+      sellerProfileId: 'seller-1',
+      totalAmount: 19800,
+      currency: 'NGN',
+      status: OrderStatus.QUOTE_ACCEPTED,
+    });
+    mockUsersService.findById.mockResolvedValue({
+      id: 'buyer-1',
+      email: 'buyer@example.com',
+      firstName: 'Test',
+      lastName: 'Buyer',
+    });
+    mockPaymentIntentRepo.findOne.mockResolvedValue(null);
+    mockMonnifyService.initializeTransaction.mockResolvedValue({
+      transactionReference: 'MNF_TXN_123',
+      paymentReference: 'MNF_PAY_123',
+      checkoutUrl: 'https://checkout.monnify.com/test',
+    });
+
+    const result = await service.initializeCheckout(
+      {
+        id: 'buyer-1',
+        email: 'buyer@example.com',
+        role: 'buyer',
+        isEmailVerified: true,
+        isActive: true,
+      },
+      'order-1',
+      {
+        channels: ['card', 'bank_transfer'],
+      },
+    );
+
+    expect(mockMonnifyService.initializeTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        amount: 19800,
+        currencyCode: 'NGN',
+        customerEmail: 'buyer@example.com',
+        paymentReference: expect.any(String),
+      }),
+    );
+    expect(result.authorizationUrl).toBe('https://checkout.monnify.com/test');
+    expect(result.reference).toBe('MNF_TXN_123');
+    expect(result.paymentReference).toBe('MNF_PAY_123');
+    expect(result.provider).toBe('monnify');
+  });
+
   it('verifyCheckout() should mark a successful payment intent as succeeded and pay the order', async () => {
     mockPaymentIntentRepo.findOne.mockResolvedValue({
       id: 'intent-1',
@@ -295,6 +366,7 @@ describe('PaymentsService', () => {
       buyerId: 'buyer-1',
       sellerProfileId: 'seller-1',
       totalAmount: 19800,
+      platformFee: 0,
       currency: 'NGN',
       status: OrderStatus.PAYMENT_PENDING,
     });
@@ -308,6 +380,12 @@ describe('PaymentsService', () => {
     });
 
     expect(result.paymentIntent.status).toBe(PaymentIntentStatus.SUCCEEDED);
+    expect(mockOrderRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'order-1',
+        platformFee: 1980,
+      }),
+    );
     expect(mockOrderRepo.save).toHaveBeenCalledWith(
       expect.objectContaining({
         id: 'order-1',
@@ -388,6 +466,7 @@ describe('PaymentsService', () => {
       buyerId: 'buyer-1',
       sellerProfileId: 'seller-1',
       totalAmount: 19800,
+      platformFee: 0,
       currency: 'NGN',
       status: OrderStatus.PAYMENT_PENDING,
     });
@@ -420,6 +499,12 @@ describe('PaymentsService', () => {
     expect(mockOrderRepo.save).toHaveBeenCalledWith(
       expect.objectContaining({
         id: 'order-1',
+        platformFee: 1980,
+      }),
+    );
+    expect(mockOrderRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'order-1',
         status: OrderStatus.PAID,
       }),
     );
@@ -437,7 +522,7 @@ describe('PaymentsService', () => {
     });
     mockPaymentsQueue.add.mockResolvedValue({});
 
-    const result = await service.enqueueWebhook({
+    const result = await service.enqueueWebhook('paystack' as never, {
       event: 'charge.success',
       data: {
         id: 12345,
@@ -473,7 +558,7 @@ describe('PaymentsService', () => {
     });
     mockPaymentsQueue.add.mockResolvedValue({});
 
-    const result = await service.enqueueWebhook({
+    const result = await service.enqueueWebhook('paystack' as never, {
       event: 'charge.success',
       data: {
         reference: 'PAY-RND-100-TESTREF',
@@ -496,6 +581,38 @@ describe('PaymentsService', () => {
       received: true,
       queued: true,
       eventId: 'webhook-1',
+    });
+  });
+
+  it('enqueueWebhook() should persist Monnify refund events using the provider-specific reference', async () => {
+    mockWebhookRepo.findOne.mockResolvedValue(null);
+    mockWebhookRepo.save.mockResolvedValue({
+      id: 'webhook-monnify-1',
+      eventType: 'SUCCESSFUL_REFUND',
+      reference: 'MNFY_TXN_1',
+      processed: false,
+    });
+    mockPaymentsQueue.add.mockResolvedValue({});
+
+    const result = await service.enqueueWebhook('monnify' as never, {
+      eventType: 'SUCCESSFUL_REFUND',
+      eventData: {
+        refundReference: 'MNFY_REF_1',
+        transactionReference: 'MNFY_TXN_1',
+      },
+    });
+
+    expect(mockWebhookRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'SUCCESSFUL_REFUND',
+        paystackEventId: 'MNFY_REF_1',
+        reference: 'MNFY_TXN_1',
+      }),
+    );
+    expect(result).toEqual({
+      received: true,
+      queued: true,
+      eventId: 'webhook-monnify-1',
     });
   });
 
@@ -549,6 +666,30 @@ describe('PaymentsService', () => {
         id: 'webhook-refund-1',
         processed: true,
       }),
+    );
+  });
+
+  it('processWebhookEvent() should forward Monnify disbursement webhooks to the payouts service', async () => {
+    mockWebhookRepo.findOne.mockResolvedValue({
+      id: 'webhook-monnify-disbursement',
+      eventType: 'SUCCESSFUL_DISBURSEMENT',
+      reference: 'PAYOUT-REF-1',
+      processed: false,
+      rawPayload: {
+        eventType: 'SUCCESSFUL_DISBURSEMENT',
+        eventData: { reference: 'PAYOUT-REF-1' },
+      },
+    });
+    mockPayoutsService.processMonnifyWebhook.mockResolvedValue(true);
+
+    await service.processWebhookEvent('webhook-monnify-disbursement');
+
+    expect(mockPayoutsService.processMonnifyWebhook).toHaveBeenCalledWith(
+      'SUCCESSFUL_DISBURSEMENT',
+      {
+        eventType: 'SUCCESSFUL_DISBURSEMENT',
+        eventData: { reference: 'PAYOUT-REF-1' },
+      },
     );
   });
 
@@ -622,6 +763,7 @@ describe('PaymentsService', () => {
       buyerId: 'buyer-1',
       sellerProfileId: 'seller-1',
       totalAmount: 19800,
+      platformFee: 0,
       currency: 'NGN',
       status: OrderStatus.PAYMENT_PENDING,
     });
