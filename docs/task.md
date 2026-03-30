@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-# Rands Backend Task Tracker
-=======
 # Shopflow Backend Task Tracker
->>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
 
 This file is the current high-level implementation tracker for the backend.
 It replaces the original scaffold-era checklist, which is now outdated.

@@ -369,11 +369,7 @@ export class PlatformConfigService implements OnModuleInit {
         marketName: this.getMarketName(),
         countryCode: this.getCountryCode(),
         currency: this.getCurrency(),
-<<<<<<< HEAD
-        supportEmail: supportEmail ?? 'support@rands.com.ng',
-=======
         supportEmail: supportEmail ?? 'support@shopflow.com.ng',
->>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
       },
       config: {
         defaultCheckoutProvider,

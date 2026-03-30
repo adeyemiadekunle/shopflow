@@ -4,6 +4,10 @@ services:
       context: ./apps/backend
       dockerfile: Dockerfile
     container_name: shopflow-api
+    command:
+      - sh
+      - -lc
+      - node node_modules/typeorm/cli.js -d dist/database/data-source.js migration:run && node dist/main.js
     ports:
       - '3000:3000'
     depends_on:
@@ -34,11 +38,7 @@ services:
     build:
       context: .
       dockerfile: apps/frontend/Dockerfile
-<<<<<<< HEAD
-    container_name: rands-frontend
-=======
     container_name: shopflow-frontend
->>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
     ports:
       - '3002:3000'
     depends_on:

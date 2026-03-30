@@ -87,11 +87,7 @@
       "targets": [
         {
           "editorMode": "code",
-<<<<<<< HEAD
-          "expr": "up{job=\"rands-api\"}",
-=======
           "expr": "up{job=\"shopflow-api\"}",
->>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -277,11 +273,7 @@
       "targets": [
         {
           "editorMode": "code",
-<<<<<<< HEAD
-          "expr": "sum(rands_queue_jobs_total{queue=\"payments\",status=~\"waiting|active|delayed|failed\"})",
-=======
           "expr": "sum(shopflow_queue_jobs_total{queue=\"payments\",status=~\"waiting|active|delayed|failed\"})",
->>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -551,11 +543,7 @@
       "targets": [
         {
           "editorMode": "code",
-<<<<<<< HEAD
-          "expr": "sum by (queue) (rands_queue_jobs_total{status=~\"waiting|active|delayed|failed\"})",
-=======
           "expr": "sum by (queue) (shopflow_queue_jobs_total{status=~\"waiting|active|delayed|failed\"})",
->>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
           "legendFormat": "{{queue}}",
           "range": true,
           "refId": "A"
@@ -643,11 +631,7 @@
       "targets": [
         {
           "editorMode": "code",
-<<<<<<< HEAD
-          "expr": "rands_queue_jobs_total{queue=\"payments\",status=~\"failed|delayed|active|waiting\"}",
-=======
           "expr": "shopflow_queue_jobs_total{queue=\"payments\",status=~\"failed|delayed|active|waiting\"}",
->>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
           "legendFormat": "{{status}}",
           "range": true,
           "refId": "A"
@@ -678,11 +662,7 @@
       "targets": [
         {
           "editorMode": "code",
-<<<<<<< HEAD
-          "expr": "{container=\"rands-api\"}",
-=======
           "expr": "{container=\"shopflow-api\"}",
->>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
           "queryType": "range",
           "refId": "A"
         }
@@ -743,11 +723,7 @@
       "targets": [
         {
           "editorMode": "code",
-<<<<<<< HEAD
-          "expr": "sum(rands_payment_reconciliation_open_issues_total{severity=\"error\"})",
-=======
           "expr": "sum(shopflow_payment_reconciliation_open_issues_total{severity=\"error\"})",
->>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -809,11 +785,7 @@
       "targets": [
         {
           "editorMode": "code",
-<<<<<<< HEAD
-          "expr": "time() - rands_payment_reconciliation_last_run_timestamp_seconds",
-=======
           "expr": "time() - shopflow_payment_reconciliation_last_run_timestamp_seconds",
->>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -875,11 +847,7 @@
       "targets": [
         {
           "editorMode": "code",
-<<<<<<< HEAD
-          "expr": "rands_payment_reconciliation_last_run_issue_count",
-=======
           "expr": "shopflow_payment_reconciliation_last_run_issue_count",
->>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -908,11 +876,7 @@
   "timepicker": {},
   "timezone": "",
   "title": "API and Payments Overview",
-<<<<<<< HEAD
-  "uid": "rands-api-payments-overview",
-=======
   "uid": "shopflow-api-payments-overview",
->>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
   "version": 1,
   "weekStart": ""
 }

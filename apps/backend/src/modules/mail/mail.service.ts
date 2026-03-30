@@ -10,11 +10,7 @@ export class MailService {
   private readonly frontendBaseUrl: string;
 
   constructor(private readonly config: ConfigService) {
-<<<<<<< HEAD
-    this.from = this.config.get<string>('mail.from') ?? 'no-reply@rands.local';
-=======
     this.from = this.config.get<string>('mail.from') ?? 'no-reply@shopflow.local';
->>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
     this.frontendBaseUrl =
       this.config.get<string>('mail.frontendBaseUrl') ??
       'http://localhost:3001';
@@ -40,15 +36,9 @@ export class MailService {
 
   async sendVerificationEmail(email: string, token: string): Promise<void> {
     const verifyUrl = `${this.frontendBaseUrl}/verify-email?email=${encodeURIComponent(email)}&token=${encodeURIComponent(token)}`;
-<<<<<<< HEAD
-    const subject = 'Verify your Rands account';
-    const text =
-      `Verify your Rands account by clicking this link:\n\n${verifyUrl}\n\n` +
-=======
     const subject = 'Verify your Shopflow account';
     const text =
       `Verify your Shopflow account by clicking this link:\n\n${verifyUrl}\n\n` +
->>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
       'If you did not create this account, you can ignore this email.';
 
     await this.sendOrLog(email, subject, text);
@@ -56,15 +46,9 @@ export class MailService {
 
   async sendPasswordResetEmail(email: string, token: string): Promise<void> {
     const resetUrl = `${this.frontendBaseUrl}/reset-password?email=${encodeURIComponent(email)}&token=${encodeURIComponent(token)}`;
-<<<<<<< HEAD
-    const subject = 'Reset your Rands password';
-    const text =
-      `Reset your Rands password by clicking this link:\n\n${resetUrl}\n\n` +
-=======
     const subject = 'Reset your Shopflow password';
     const text =
       `Reset your Shopflow password by clicking this link:\n\n${resetUrl}\n\n` +
->>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
       'If you did not request a password reset, you can ignore this email.';
 
     await this.sendOrLog(email, subject, text);

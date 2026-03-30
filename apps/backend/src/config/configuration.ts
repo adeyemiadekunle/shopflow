@@ -34,11 +34,7 @@ export default () => ({
     refreshExpiresIn: process.env['JWT_REFRESH_EXPIRES_IN'] ?? '7d',
   },
   mail: {
-<<<<<<< HEAD
-    from: process.env['MAIL_FROM'] ?? 'no-reply@rands.local',
-=======
     from: process.env['MAIL_FROM'] ?? 'no-reply@shopflow.local',
->>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
     smtpHost: process.env['SMTP_HOST'] ?? '',
     smtpPort: parseInt(process.env['SMTP_PORT'] ?? '587', 10),
     smtpUser: process.env['SMTP_USER'] ?? '',

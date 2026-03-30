@@ -139,11 +139,7 @@ describe('CatalogService', () => {
       ],
       media: [
         {
-<<<<<<< HEAD
-          url: 'https://cdn.rands.ng/products/ankara-1.webp',
-=======
           url: 'https://cdn.shopflow.ng/products/ankara-1.webp',
->>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
           isPrimary: true,
         },
       ],
@@ -219,20 +215,12 @@ describe('CatalogService', () => {
       media: [
         {
           type: 'image',
-<<<<<<< HEAD
-          url: 'https://cdn.rands.ng/products/ankara-1.webp',
-=======
           url: 'https://cdn.shopflow.ng/products/ankara-1.webp',
->>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
           isPrimary: false,
         },
         {
           type: 'image',
-<<<<<<< HEAD
-          url: 'https://cdn.rands.ng/products/ankara-2.webp',
-=======
           url: 'https://cdn.shopflow.ng/products/ankara-2.webp',
->>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
           isPrimary: true,
         },
       ],
@@ -240,20 +228,12 @@ describe('CatalogService', () => {
 
     expect(result.media).toEqual([
       expect.objectContaining({
-<<<<<<< HEAD
-        url: 'https://cdn.rands.ng/products/ankara-1.webp',
-=======
         url: 'https://cdn.shopflow.ng/products/ankara-1.webp',
->>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
         displayOrder: 0,
         isPrimary: false,
       }),
       expect.objectContaining({
-<<<<<<< HEAD
-        url: 'https://cdn.rands.ng/products/ankara-2.webp',
-=======
         url: 'https://cdn.shopflow.ng/products/ankara-2.webp',
->>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
         displayOrder: 1,
         isPrimary: true,
       }),
@@ -273,11 +253,7 @@ describe('CatalogService', () => {
         media: [
           {
             type: 'video',
-<<<<<<< HEAD
-            url: 'https://cdn.rands.ng/products/ankara-clip.mp4',
-=======
             url: 'https://cdn.shopflow.ng/products/ankara-clip.mp4',
->>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
           },
         ],
       }),

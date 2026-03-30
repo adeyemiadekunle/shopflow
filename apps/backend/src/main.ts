@@ -56,11 +56,7 @@ async function bootstrap() {
   }
 
   await app.listen(port);
-<<<<<<< HEAD
-  console.log(`🚀 Rands API running on: http://localhost:${port}/api/v1`);
-=======
   console.log(`🚀 Shopflow API running on: http://localhost:${port}/api/v1`);
->>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
   if (swaggerEnabled) {
     console.log(`📖 Swagger docs: http://localhost:${port}/api-docs`);
   }

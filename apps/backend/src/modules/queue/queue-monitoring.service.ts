@@ -39,11 +39,7 @@ export class QueueMonitoringService implements OnModuleInit, OnModuleDestroy {
     private readonly connection: QueueConnectionOptions,
   ) {
     const existingMetric = register.getSingleMetric(
-<<<<<<< HEAD
-      'rands_queue_jobs_total',
-=======
       'shopflow_queue_jobs_total',
->>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
     ) as Gauge<'queue' | 'status'> | undefined;
 
     if (existingMetric) {
@@ -53,11 +49,7 @@ export class QueueMonitoringService implements OnModuleInit, OnModuleDestroy {
 
     const getSummary = this.getSummary.bind(this);
     this.jobsGauge = new Gauge({
-<<<<<<< HEAD
-      name: 'rands_queue_jobs_total',
-=======
       name: 'shopflow_queue_jobs_total',
->>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
       help: 'Current BullMQ job counts by queue and status',
       labelNames: ['queue', 'status'],
       async collect() {

@@ -22,13 +22,8 @@ npm run start:dev
 - **Queue Health:** `http://localhost:3000/health/queues`
 - **Metrics:** `http://localhost:3000/api/v1/metrics`
 - **Swagger:** `http://localhost:3000/api-docs`
-<<<<<<< HEAD
-- **Grafana Queue Dashboard:** `Rands / Queue Monitoring`
-- **Grafana API Dashboard:** `Rands / API and Payments Overview`
-=======
 - **Grafana Queue Dashboard:** `Shopflow / Queue Monitoring`
 - **Grafana API Dashboard:** `Shopflow / API and Payments Overview`
->>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
 
 ## Commands
 
