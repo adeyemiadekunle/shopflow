@@ -1,7 +1,4 @@
-version: '3.9'
-
 services:
-  # ─── App ────────────────────────────────────────────────────────
   api:
     build:
       context: ./apps/backend
@@ -33,7 +30,31 @@ services:
     labels:
       logging: 'promtail'
 
-  # ─── PostgreSQL ──────────────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+    container_name: rands-frontend
+    ports:
+      - '3002:3000'
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: '1'
+      HOSTNAME: 0.0.0.0
+      PORT: 3000
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:3000/ || exit 1']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+    labels:
+      logging: 'promtail'
+
   postgres:
     image: postgres:16-alpine
     container_name: rands-postgres
@@ -52,7 +73,6 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # ─── Redis ───────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: rands-redis
@@ -67,7 +87,6 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # ─── Prometheus ──────────────────────────────────────────────────
   prometheus:
     image: prom/prometheus:latest
     container_name: rands-prometheus
@@ -82,7 +101,6 @@ services:
       - '--web.enable-lifecycle'
     restart: unless-stopped
 
-  # ─── Grafana ─────────────────────────────────────────────────────
   grafana:
     image: grafana/grafana:latest
     container_name: rands-grafana
@@ -100,7 +118,6 @@ services:
       - loki
     restart: unless-stopped
 
-  # ─── Loki ────────────────────────────────────────────────────────
   loki:
     image: grafana/loki:latest
     container_name: rands-loki
@@ -112,7 +129,6 @@ services:
     command: -config.file=/etc/loki/local-config.yaml
     restart: unless-stopped
 
-  # ─── Promtail ────────────────────────────────────────────────────
   promtail:
     image: grafana/promtail:latest
     container_name: rands-promtail
