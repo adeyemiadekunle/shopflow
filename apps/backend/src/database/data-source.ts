@@ -7,9 +7,15 @@ export default new DataSource({
   type: 'postgres',
   host: process.env['DB_HOST'] ?? 'localhost',
   port: parseInt(process.env['DB_PORT'] ?? '5432', 10),
+<<<<<<< HEAD
   username: process.env['DB_USERNAME'] ?? 'rands',
   password: process.env['DB_PASSWORD'] ?? 'rands_secret',
   database: process.env['DB_NAME'] ?? 'rands_db',
+=======
+  username: process.env['DB_USERNAME'] ?? 'shopflow',
+  password: process.env['DB_PASSWORD'] ?? 'shopflow_secret',
+  database: process.env['DB_NAME'] ?? 'shopflow_db',
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
   synchronize: false,
   logging: process.env['DB_LOGGING'] === 'true',
   entities: [isTsRuntime ? 'src/**/*.entity.ts' : 'dist/**/*.entity.js'],

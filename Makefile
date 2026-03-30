@@ -1,4 +1,4 @@
-# ─── Rands Makefile ──────────────────────────────────────────────────────────
+# ─── Shopflow Makefile ──────────────────────────────────────────────────────────
 .PHONY: help dev build test lint migrate docker-up docker-down docker-logs clean
 
 help: ## Show this help

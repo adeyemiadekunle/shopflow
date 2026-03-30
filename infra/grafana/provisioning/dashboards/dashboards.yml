@@ -1,9 +1,15 @@
 apiVersion: 1
 
 providers:
+<<<<<<< HEAD
   - name: Rands Dashboards
     orgId: 1
     folder: Rands
+=======
+  - name: Shopflow Dashboards
+    orgId: 1
+    folder: Shopflow
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
     type: file
     disableDeletion: false
     editable: false

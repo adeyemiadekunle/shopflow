@@ -38,8 +38,8 @@ async function bootstrap() {
   // ── Swagger / OpenAPI ───────────────────────────────────────────────
   if (swaggerEnabled) {
     const swaggerConfig = new DocumentBuilder()
-      .setTitle('Rands API')
-      .setDescription('Rands Social Ecommerce Platform — Backend API')
+      .setTitle('Shopflow API')
+      .setDescription('Shopflow Social Ecommerce Platform — Backend API')
       .setVersion('1.0')
       .addBearerAuth()
       .addTag('auth', 'Authentication endpoints')
@@ -56,7 +56,11 @@ async function bootstrap() {
   }
 
   await app.listen(port);
+<<<<<<< HEAD
   console.log(`🚀 Rands API running on: http://localhost:${port}/api/v1`);
+=======
+  console.log(`🚀 Shopflow API running on: http://localhost:${port}/api/v1`);
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
   if (swaggerEnabled) {
     console.log(`📖 Swagger docs: http://localhost:${port}/api-docs`);
   }

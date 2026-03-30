@@ -3,7 +3,7 @@ services:
     build:
       context: ./apps/backend
       dockerfile: Dockerfile
-    container_name: rands-api
+    container_name: shopflow-api
     ports:
       - '3000:3000'
     depends_on:
@@ -17,9 +17,9 @@ services:
       PORT: 3000
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_USERNAME: rands
-      DB_PASSWORD: rands_secret
-      DB_NAME: rands_db
+      DB_USERNAME: shopflow
+      DB_PASSWORD: shopflow_secret
+      DB_NAME: shopflow_db
       REDIS_HOST: redis
       REDIS_PORT: 6379
       JWT_ACCESS_SECRET: change_me_access_32_chars_minimum
@@ -34,7 +34,11 @@ services:
     build:
       context: .
       dockerfile: apps/frontend/Dockerfile
+<<<<<<< HEAD
     container_name: rands-frontend
+=======
+    container_name: shopflow-frontend
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
     ports:
       - '3002:3000'
     depends_on:
@@ -57,17 +61,17 @@ services:
 
   postgres:
     image: postgres:16-alpine
-    container_name: rands-postgres
+    container_name: shopflow-postgres
     ports:
       - '5432:5432'
     environment:
-      POSTGRES_USER: rands
-      POSTGRES_PASSWORD: rands_secret
-      POSTGRES_DB: rands_db
+      POSTGRES_USER: shopflow
+      POSTGRES_PASSWORD: shopflow_secret
+      POSTGRES_DB: shopflow_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U rands -d rands_db']
+      test: ['CMD-SHELL', 'pg_isready -U shopflow -d shopflow_db']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -75,7 +79,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: rands-redis
+    container_name: shopflow-redis
     ports:
       - '6379:6379'
     volumes:
@@ -89,7 +93,7 @@ services:
 
   prometheus:
     image: prom/prometheus:latest
-    container_name: rands-prometheus
+    container_name: shopflow-prometheus
     ports:
       - '9090:9090'
     volumes:
@@ -103,7 +107,7 @@ services:
 
   grafana:
     image: grafana/grafana:latest
-    container_name: rands-grafana
+    container_name: shopflow-grafana
     ports:
       - '3001:3000'
     volumes:
@@ -120,7 +124,7 @@ services:
 
   loki:
     image: grafana/loki:latest
-    container_name: rands-loki
+    container_name: shopflow-loki
     ports:
       - '3100:3100'
     volumes:
@@ -131,7 +135,7 @@ services:
 
   promtail:
     image: grafana/promtail:latest
-    container_name: rands-promtail
+    container_name: shopflow-promtail
     volumes:
       - ./infra/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro

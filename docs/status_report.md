@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 # Rands Backend Status Report
+=======
+# Shopflow Backend Status Report
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
 
 Last refreshed: 2026-03-29
 

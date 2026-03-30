@@ -127,7 +127,11 @@ describe('FeedService', () => {
 
     const post = await service.createPost('seller-1', {
       content: 'New drop',
+<<<<<<< HEAD
       media: [{ type: UploadMediaType.IMAGE, url: 'https://cdn.rands.test/a' }],
+=======
+      media: [{ type: UploadMediaType.IMAGE, url: 'https://cdn.shopflow.test/a' }],
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
       productId: 'product-1',
     });
 
@@ -141,11 +145,19 @@ describe('FeedService', () => {
         media: [
           {
             type: UploadMediaType.IMAGE,
+<<<<<<< HEAD
             url: 'https://cdn.rands.test/a',
           },
           {
             type: UploadMediaType.IMAGE,
             url: 'https://cdn.rands.test/a',
+=======
+            url: 'https://cdn.shopflow.test/a',
+          },
+          {
+            type: UploadMediaType.IMAGE,
+            url: 'https://cdn.shopflow.test/a',
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
           },
         ],
       }),
@@ -159,7 +171,11 @@ describe('FeedService', () => {
         media: [
           {
             type: UploadMediaType.VIDEO,
+<<<<<<< HEAD
             url: 'https://cdn.rands.test/video.mp4',
+=======
+            url: 'https://cdn.shopflow.test/video.mp4',
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
           },
         ],
       }),

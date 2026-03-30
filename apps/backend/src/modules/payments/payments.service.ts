@@ -116,12 +116,20 @@ export class PaymentsService {
     const getLatestRun = this.getLatestReconciliationRun.bind(this);
 
     const existingOpenIssuesGauge = register.getSingleMetric(
+<<<<<<< HEAD
       'rands_payment_reconciliation_open_issues_total',
+=======
+      'shopflow_payment_reconciliation_open_issues_total',
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
     ) as OpenIssuesGauge | undefined;
     this.openIssuesGauge =
       existingOpenIssuesGauge ??
       new Gauge({
+<<<<<<< HEAD
         name: 'rands_payment_reconciliation_open_issues_total',
+=======
+        name: 'shopflow_payment_reconciliation_open_issues_total',
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
         help: 'Open payment reconciliation issues grouped by severity',
         labelNames: ['severity'],
         async collect() {
@@ -138,12 +146,20 @@ export class PaymentsService {
       });
 
     const existingLastRunTimestampGauge = register.getSingleMetric(
+<<<<<<< HEAD
       'rands_payment_reconciliation_last_run_timestamp_seconds',
+=======
+      'shopflow_payment_reconciliation_last_run_timestamp_seconds',
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
     ) as SimpleGauge | undefined;
     this.lastRunTimestampGauge =
       existingLastRunTimestampGauge ??
       new Gauge({
+<<<<<<< HEAD
         name: 'rands_payment_reconciliation_last_run_timestamp_seconds',
+=======
+        name: 'shopflow_payment_reconciliation_last_run_timestamp_seconds',
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
         help: 'Unix timestamp of the latest completed payment reconciliation run',
         async collect() {
           const latestRun = await getLatestRun();
@@ -156,12 +172,20 @@ export class PaymentsService {
       });
 
     const existingLastRunIssueCountGauge = register.getSingleMetric(
+<<<<<<< HEAD
       'rands_payment_reconciliation_last_run_issue_count',
+=======
+      'shopflow_payment_reconciliation_last_run_issue_count',
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
     ) as SimpleGauge | undefined;
     this.lastRunIssueCountGauge =
       existingLastRunIssueCountGauge ??
       new Gauge({
+<<<<<<< HEAD
         name: 'rands_payment_reconciliation_last_run_issue_count',
+=======
+        name: 'shopflow_payment_reconciliation_last_run_issue_count',
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
         help: 'Number of issues found in the latest completed payment reconciliation run',
         async collect() {
           const latestRun = await getLatestRun();
@@ -170,12 +194,20 @@ export class PaymentsService {
       });
 
     const existingLastRunRepairCountGauge = register.getSingleMetric(
+<<<<<<< HEAD
       'rands_payment_reconciliation_last_run_repair_count',
+=======
+      'shopflow_payment_reconciliation_last_run_repair_count',
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
     ) as SimpleGauge | undefined;
     this.lastRunRepairCountGauge =
       existingLastRunRepairCountGauge ??
       new Gauge({
+<<<<<<< HEAD
         name: 'rands_payment_reconciliation_last_run_repair_count',
+=======
+        name: 'shopflow_payment_reconciliation_last_run_repair_count',
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
         help: 'Number of repairs applied in the latest completed payment reconciliation run',
         async collect() {
           const latestRun = await getLatestRun();

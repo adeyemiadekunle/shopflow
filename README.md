@@ -1,6 +1,6 @@
-# Rands — Social Ecommerce Platform
+# Shopflow — Social Ecommerce Platform
 
-**Rands** is a production-grade social ecommerce platform where buyers discover products through a social feed and purchase directly from verified sellers. Built with NestJS + PostgreSQL + Redis, designed for multi-market deployment with full admin configurability.
+**Shopflow** is a production-grade social ecommerce platform where buyers discover products through a social feed and purchase directly from verified sellers. Built with NestJS + PostgreSQL + Redis, designed for multi-market deployment with full admin configurability.
 
 ---
 
@@ -126,7 +126,7 @@ See [`apps/backend/.env.example`](apps/backend/.env.example) for the full list. 
 | `PLATFORM_CURRENCY` | ISO 4217 currency code for this deployment (e.g. `NGN`, `GHS`) |
 | `PLATFORM_COUNTRY_CODE` | ISO 3166-1 alpha-2 country code (e.g. `NG`, `GH`) |
 | `PLATFORM_MARKET_NAME` | Human-readable market name (e.g. `Nigeria`) |
-| `PLATFORM_NAME` | Platform display name (e.g. `Rands`) |
+| `PLATFORM_NAME` | Platform display name (e.g. `Shopflow`) |
 
 > **Note:** `PLATFORM_*` variables are set **once at deploy time** and must never be changed on a live database with existing financial records. See [Platform Config](#platform-config) for details.
 
@@ -421,10 +421,17 @@ Example upload-url response shape:
 
 ```json
 {
+<<<<<<< HEAD
   "bucket": "rands-media-bucket",
   "objectKey": "catalog/seller-123/2026/03/29/1711730000000-abc12345-ankara-drop-1.webp",
   "uploadUrl": "https://...",
   "publicUrl": "https://cdn.rands.ng/catalog/seller-123/2026/03/29/1711730000000-abc12345-ankara-drop-1.webp",
+=======
+  "bucket": "shopflow-media-bucket",
+  "objectKey": "catalog/seller-123/2026/03/29/1711730000000-abc12345-ankara-drop-1.webp",
+  "uploadUrl": "https://...",
+  "publicUrl": "https://cdn.shopflow.ng/catalog/seller-123/2026/03/29/1711730000000-abc12345-ankara-drop-1.webp",
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
   "headers": {
     "Content-Type": "image/webp"
   },
@@ -444,7 +451,11 @@ Catalog create/update can then send media like:
   "media": [
     {
       "type": "image",
+<<<<<<< HEAD
       "url": "https://cdn.rands.ng/catalog/seller-123/.../ankara-drop-1.webp",
+=======
+      "url": "https://cdn.shopflow.ng/catalog/seller-123/.../ankara-drop-1.webp",
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
       "cdnKey": "catalog/seller-123/.../ankara-drop-1.webp",
       "isPrimary": true
     }
@@ -543,14 +554,22 @@ Public queue backlog summary for operational visibility across:
 
 Each queue returns counts for `waiting`, `active`, `completed`, `failed`, `delayed`, and `paused`.
 
+<<<<<<< HEAD
 Queue monitoring is also pre-provisioned in Grafana as the `Queue Monitoring` dashboard under the `Rands` folder. It visualises:
+=======
+Queue monitoring is also pre-provisioned in Grafana as the `Queue Monitoring` dashboard under the `Shopflow` folder. It visualises:
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
 
 - payment queue waiting and failed jobs
 - delayed order jobs
 - dead-letter backlog
 - queue jobs grouped by queue and status
 
+<<<<<<< HEAD
 Grafana also preloads an `API and Payments Overview` dashboard under the same `Rands` folder. It visualises:
+=======
+Grafana also preloads an `API and Payments Overview` dashboard under the same `Shopflow` folder. It visualises:
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
 
 - API target health
 - process memory and CPU pressure
@@ -574,7 +593,7 @@ Set in `.env` before the instance first starts. **Never change on a live databas
 | `PLATFORM_CURRENCY` | `NGN` | ISO 4217 currency code stamped on all new records |
 | `PLATFORM_COUNTRY_CODE` | `NG` | ISO 3166-1 alpha-2 country code |
 | `PLATFORM_MARKET_NAME` | `Nigeria` | Human-readable market name |
-| `PLATFORM_NAME` | `Rands` | Platform display name |
+| `PLATFORM_NAME` | `Shopflow` | Platform display name |
 
 > [!WARNING]
 > Every `LedgerEntry`, `LedgerAccount`, and `PaymentIntent` stores its own `currency` at creation time. Changing `PLATFORM_CURRENCY` after launch does not migrate existing records — it only affects new ones.
@@ -599,7 +618,11 @@ Safe to change at any time — they apply to future records only.
 | `platform.supported_payment_gateways` | `paystack,monnify` | Active payment gateways |
 | `payments.checkout.default_provider` | `paystack` | Default buyer checkout provider |
 | `payouts.default_provider` | `paystack` | Default seller payout provider |
+<<<<<<< HEAD
 | `platform.support_email` | `support@rands.ng` | Support contact |
+=======
+| `platform.support_email` | `support@shopflow.ng` | Support contact |
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
 | `features.feed.enabled` | `true` | Platform-wide seller feed posting toggle |
 | `features.chat.enabled` | `true` | Platform-wide buyer-seller chat toggle |
 | `features.media.catalog.images.enabled` | `true` | Platform-wide catalog image upload toggle |
@@ -658,7 +681,11 @@ Grafana local login:
 - Password: `admin`
 
 Grafana dashboards:
+<<<<<<< HEAD
 - Folder: `Rands`
+=======
+- Folder: `Shopflow`
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
 - Dashboard: `Queue Monitoring`
 - Dashboard: `API and Payments Overview`
 
@@ -726,4 +753,4 @@ infra/
 
 ## License
 
-Private — All rights reserved © Rands 2026.
+Private — All rights reserved © Shopflow 2026.

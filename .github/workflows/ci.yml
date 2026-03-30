@@ -18,13 +18,13 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: rands
-          POSTGRES_PASSWORD: rands_secret
-          POSTGRES_DB: rands_db_test
+          POSTGRES_USER: shopflow
+          POSTGRES_PASSWORD: shopflow_secret
+          POSTGRES_DB: shopflow_db_test
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U rands"
+          --health-cmd="pg_isready -U shopflow"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -43,9 +43,9 @@ jobs:
       NODE_ENV: test
       DB_HOST: localhost
       DB_PORT: 5432
-      DB_USERNAME: rands
-      DB_PASSWORD: rands_secret
-      DB_NAME: rands_db_test
+      DB_USERNAME: shopflow
+      DB_PASSWORD: shopflow_secret
+      DB_NAME: shopflow_db_test
       REDIS_HOST: localhost
       REDIS_PORT: 6379
       JWT_ACCESS_SECRET: test_access_secret_32_characters
@@ -84,4 +84,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build Docker image
-        run: docker build -t rands-api:${{ github.sha }} ./apps/backend
+        run: docker build -t shopflow-api:${{ github.sha }} ./apps/backend

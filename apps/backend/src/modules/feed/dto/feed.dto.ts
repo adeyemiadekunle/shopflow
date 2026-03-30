@@ -23,7 +23,7 @@ export class CreateFeedPostDto {
   @IsNotEmpty()
   content!: string;
 
-  @ApiPropertyOptional({ example: ['https://cdn.rands.ng/feed/img1.webp'] })
+  @ApiPropertyOptional({ example: ['https://cdn.shopflow.ng/feed/img1.webp'] })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })

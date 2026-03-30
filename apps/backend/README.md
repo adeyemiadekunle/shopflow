@@ -1,6 +1,6 @@
-# Rands Backend — NestJS API
+# Shopflow Backend — NestJS API
 
-Production-grade NestJS backend for the Rands social ecommerce platform.
+Production-grade NestJS backend for the Shopflow social ecommerce platform.
 
 > For full project documentation see the [root README](../../README.md).
 
@@ -22,8 +22,13 @@ npm run start:dev
 - **Queue Health:** `http://localhost:3000/health/queues`
 - **Metrics:** `http://localhost:3000/api/v1/metrics`
 - **Swagger:** `http://localhost:3000/api-docs`
+<<<<<<< HEAD
 - **Grafana Queue Dashboard:** `Rands / Queue Monitoring`
 - **Grafana API Dashboard:** `Rands / API and Payments Overview`
+=======
+- **Grafana Queue Dashboard:** `Shopflow / Queue Monitoring`
+- **Grafana API Dashboard:** `Shopflow / API and Payments Overview`
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
 
 ## Commands
 
@@ -67,7 +72,7 @@ Copy `.env.example` to `.env` and fill in:
 | `PLATFORM_CURRENCY` | ISO 4217 code for this deployment (e.g. `NGN`) |
 | `PLATFORM_COUNTRY_CODE` | ISO 3166-1 alpha-2 (e.g. `NG`) |
 | `PLATFORM_MARKET_NAME` | Market name (e.g. `Nigeria`) |
-| `PLATFORM_NAME` | Platform display name (e.g. `Rands`) |
+| `PLATFORM_NAME` | Platform display name (e.g. `Shopflow`) |
 
 > `PLATFORM_*` vars are set once at deploy time and must not be changed on a live database. Business-rule settings (commission rate, return policy, etc.) remain configurable via the Admin API.
 

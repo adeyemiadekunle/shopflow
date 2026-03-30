@@ -1,6 +1,6 @@
 export default () => ({
   app: {
-    name: process.env['APP_NAME'] ?? 'rands-api',
+    name: process.env['APP_NAME'] ?? 'shopflow-api',
     port: parseInt(process.env['PORT'] ?? '3000', 10),
     env: process.env['NODE_ENV'] ?? 'development',
     baseUrl: process.env['APP_BASE_URL'] ?? 'http://localhost:3000',
@@ -15,9 +15,9 @@ export default () => ({
   database: {
     host: process.env['DB_HOST'] ?? 'localhost',
     port: parseInt(process.env['DB_PORT'] ?? '5432', 10),
-    username: process.env['DB_USERNAME'] ?? 'rands',
-    password: process.env['DB_PASSWORD'] ?? 'rands_secret',
-    name: process.env['DB_NAME'] ?? 'rands_db',
+    username: process.env['DB_USERNAME'] ?? 'shopflow',
+    password: process.env['DB_PASSWORD'] ?? 'shopflow_secret',
+    name: process.env['DB_NAME'] ?? 'shopflow_db',
     synchronize: process.env['DB_SYNCHRONIZE'] === 'true',
     logging: process.env['DB_LOGGING'] === 'true',
   },
@@ -34,7 +34,11 @@ export default () => ({
     refreshExpiresIn: process.env['JWT_REFRESH_EXPIRES_IN'] ?? '7d',
   },
   mail: {
+<<<<<<< HEAD
     from: process.env['MAIL_FROM'] ?? 'no-reply@rands.local',
+=======
+    from: process.env['MAIL_FROM'] ?? 'no-reply@shopflow.local',
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
     smtpHost: process.env['SMTP_HOST'] ?? '',
     smtpPort: parseInt(process.env['SMTP_PORT'] ?? '587', 10),
     smtpUser: process.env['SMTP_USER'] ?? '',
@@ -137,6 +141,6 @@ export default () => ({
     currency: process.env['PLATFORM_CURRENCY'] ?? 'NGN',
     countryCode: process.env['PLATFORM_COUNTRY_CODE'] ?? 'NG',
     marketName: process.env['PLATFORM_MARKET_NAME'] ?? 'Nigeria',
-    platformName: process.env['PLATFORM_NAME'] ?? 'Rands',
+    platformName: process.env['PLATFORM_NAME'] ?? 'Shopflow',
   },
 });

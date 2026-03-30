@@ -1,17 +1,28 @@
 {
   "$schema": "https://ui.shadcn.com/schema.json",
+<<<<<<< HEAD
   "style": "base-nova",
+=======
+  "style": "new-york",
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
   "rsc": true,
   "tsx": true,
   "tailwind": {
     "config": "",
+<<<<<<< HEAD
     "css": "src/app/globals.css",
+=======
+    "css": "app/globals.css",
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
     "baseColor": "neutral",
     "cssVariables": true,
     "prefix": ""
   },
+<<<<<<< HEAD
   "iconLibrary": "lucide",
   "rtl": false,
+=======
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
   "aliases": {
     "components": "@/components",
     "utils": "@/lib/utils",
@@ -19,7 +30,11 @@
     "lib": "@/lib",
     "hooks": "@/hooks"
   },
+<<<<<<< HEAD
   "menuColor": "default",
   "menuAccent": "subtle",
   "registries": {}
+=======
+  "iconLibrary": "lucide"
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
 }

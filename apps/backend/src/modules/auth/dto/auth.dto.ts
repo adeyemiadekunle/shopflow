@@ -129,7 +129,7 @@ export class ResetPasswordDto {
 
 /** Admin-only DTO to create an admin account */
 export class CreateAdminDto {
-  @ApiProperty({ example: 'admin@rands.ng' })
+  @ApiProperty({ example: 'admin@shopflow.ng' })
   @IsEmail()
   email!: string;
 

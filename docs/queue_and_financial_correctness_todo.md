@@ -1,6 +1,10 @@
 # Queue and Financial Correctness TODO
 
+<<<<<<< HEAD
 This document tracks the backend hardening work needed to make `rands` safer under traffic spikes, payment retries, webhook duplication, and financial edge cases.
+=======
+This document tracks the backend hardening work needed to make `Shopflow` safer under traffic spikes, payment retries, webhook duplication, and financial edge cases.
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
 
 ## Why This Exists
 

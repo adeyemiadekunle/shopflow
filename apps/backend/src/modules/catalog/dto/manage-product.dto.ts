@@ -62,7 +62,11 @@ export class UpsertProductMediaDto {
   @IsEnum(MediaType)
   type?: MediaType;
 
+<<<<<<< HEAD
   @ApiProperty({ example: 'https://cdn.rands.ng/products/ankara-1.webp' })
+=======
+  @ApiProperty({ example: 'https://cdn.shopflow.ng/products/ankara-1.webp' })
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
   @IsString()
   url!: string;
 

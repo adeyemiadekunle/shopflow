@@ -75,7 +75,11 @@
       "targets": [
         {
           "editorMode": "code",
+<<<<<<< HEAD
           "expr": "rands_queue_jobs_total{queue=\"payments\",status=\"waiting\"}",
+=======
+          "expr": "shopflow_queue_jobs_total{queue=\"payments\",status=\"waiting\"}",
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -137,7 +141,11 @@
       "targets": [
         {
           "editorMode": "code",
+<<<<<<< HEAD
           "expr": "rands_queue_jobs_total{queue=\"payments\",status=\"failed\"}",
+=======
+          "expr": "shopflow_queue_jobs_total{queue=\"payments\",status=\"failed\"}",
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -199,7 +207,11 @@
       "targets": [
         {
           "editorMode": "code",
+<<<<<<< HEAD
           "expr": "rands_queue_jobs_total{queue=\"orders\",status=\"delayed\"}",
+=======
+          "expr": "shopflow_queue_jobs_total{queue=\"orders\",status=\"delayed\"}",
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -261,7 +273,11 @@
       "targets": [
         {
           "editorMode": "code",
+<<<<<<< HEAD
           "expr": "rands_queue_jobs_total{queue=\"dead-letter\",status=\"failed\"}",
+=======
+          "expr": "shopflow_queue_jobs_total{queue=\"dead-letter\",status=\"failed\"}",
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -349,7 +365,11 @@
       "targets": [
         {
           "editorMode": "code",
+<<<<<<< HEAD
           "expr": "sum by (queue, status) (rands_queue_jobs_total)",
+=======
+          "expr": "sum by (queue, status) (shopflow_queue_jobs_total)",
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
           "legendFormat": "{{queue}} / {{status}}",
           "range": true,
           "refId": "A"
@@ -436,7 +456,11 @@
       "targets": [
         {
           "editorMode": "code",
+<<<<<<< HEAD
           "expr": "sum by (queue) (rands_queue_jobs_total{status=~\"waiting|active|delayed|failed\"})",
+=======
+          "expr": "sum by (queue) (shopflow_queue_jobs_total{status=~\"waiting|active|delayed|failed\"})",
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
           "legendFormat": "{{queue}}",
           "range": true,
           "refId": "A"
@@ -464,7 +488,11 @@
   "timepicker": {},
   "timezone": "",
   "title": "Queue Monitoring",
+<<<<<<< HEAD
   "uid": "rands-queue-monitoring",
+=======
+  "uid": "shopflow-queue-monitoring",
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
   "version": 1,
   "weekStart": ""
 }

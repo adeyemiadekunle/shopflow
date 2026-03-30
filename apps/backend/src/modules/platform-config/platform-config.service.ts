@@ -134,11 +134,11 @@ export class PlatformConfigService implements OnModuleInit {
   }
 
   /**
-   * Platform display name (e.g. "Rands").
+   * Platform display name (e.g. "Shopflow").
    * Source: PLATFORM_NAME env var.
    */
   getPlatformName(): string {
-    return this.configService.get<string>('market.platformName') ?? 'Rands';
+    return this.configService.get<string>('market.platformName') ?? 'Shopflow';
   }
 
   // ─── Business rules (DB-backed, admin-configurable at runtime) ───────────
@@ -369,7 +369,11 @@ export class PlatformConfigService implements OnModuleInit {
         marketName: this.getMarketName(),
         countryCode: this.getCountryCode(),
         currency: this.getCurrency(),
+<<<<<<< HEAD
         supportEmail: supportEmail ?? 'support@rands.com.ng',
+=======
+        supportEmail: supportEmail ?? 'support@shopflow.com.ng',
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
       },
       config: {
         defaultCheckoutProvider,
@@ -561,7 +565,7 @@ export class PlatformConfigService implements OnModuleInit {
       },
       {
         key: PlatformConfigKey.SUPPORT_EMAIL,
-        value: 'support@rands.ng',
+        value: 'support@shopflow.ng',
         description: 'Platform support email shown to users',
         isPublic: true,
       },

@@ -10,8 +10,13 @@ describe('MediaService', () => {
 
   const configValues = new Map<string, unknown>([
     ['media.awsRegion', 'eu-west-2'],
+<<<<<<< HEAD
     ['media.bucket', 'rands-media-bucket'],
     ['media.cloudfrontBaseUrl', 'https://cdn.rands.test'],
+=======
+    ['media.bucket', 'shopflow-media-bucket'],
+    ['media.cloudfrontBaseUrl', 'https://cdn.shopflow.test'],
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
     ['media.presignExpiresInSeconds', 900],
     ['media.allowVideoUploads', true],
     ['media.accessKeyId', 'test-access-key-id'],
@@ -99,7 +104,11 @@ describe('MediaService', () => {
     );
 
     expect(result.objectKey).toContain('feed/seller-1/');
+<<<<<<< HEAD
     expect(result.publicUrl).toContain('https://cdn.rands.test/feed/seller-1/');
+=======
+    expect(result.publicUrl).toContain('https://cdn.shopflow.test/feed/seller-1/');
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
     expect(result.headers['Content-Type']).toBe('image/webp');
     expect(service.isAllowedPublicUrl(result.publicUrl)).toBe(true);
   });

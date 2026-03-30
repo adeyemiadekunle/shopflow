@@ -78,7 +78,11 @@ describe('PlatformConfigService', () => {
     ['market.currency', 'NGN'],
     ['market.countryCode', 'NG'],
     ['market.marketName', 'Nigeria'],
+<<<<<<< HEAD
     ['market.platformName', 'Rands'],
+=======
+    ['market.platformName', 'Shopflow'],
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
   ]);
 
   beforeEach(async () => {
@@ -168,7 +172,11 @@ describe('PlatformConfigService', () => {
       .mockResolvedValueOnce({ key: 'payments.supported_gateways', value: 'paystack,monnify' })
       .mockResolvedValueOnce({ key: 'platform.return_policy_days', value: '7' })
       .mockResolvedValueOnce({ key: 'platform.min_payout_amount', value: '1000' })
+<<<<<<< HEAD
       .mockResolvedValueOnce({ key: 'platform.support_email', value: 'support@rands.ng' });
+=======
+      .mockResolvedValueOnce({ key: 'platform.support_email', value: 'support@shopflow.ng' });
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
 
     mockUserRepo.count
       .mockResolvedValueOnce(20)

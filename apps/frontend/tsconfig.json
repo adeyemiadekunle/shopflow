@@ -1,8 +1,18 @@
 {
   "compilerOptions": {
+<<<<<<< HEAD
     "target": "ES2017",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
+=======
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "allowJs": true,
+    "target": "ES6",
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
     "skipLibCheck": true,
     "strict": true,
     "noEmit": true,
@@ -19,7 +29,13 @@
       }
     ],
     "paths": {
+<<<<<<< HEAD
       "@/*": ["./src/*"]
+=======
+      "@/*": [
+        "./*"
+      ]
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
     }
   },
   "include": [
@@ -27,8 +43,16 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
+<<<<<<< HEAD
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
   "exclude": ["node_modules"]
+=======
+    ".next/dev/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+>>>>>>> 2ed2340 (feat: expand shopflow platform and frontend)
 }

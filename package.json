@@ -1,5 +1,5 @@
 {
-  "name": "rands",
+  "name": "shopflow",
   "private": true,
   "workspaces": [
     "apps/*"

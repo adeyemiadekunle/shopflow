@@ -12,7 +12,7 @@ import { LedgerAccount } from './ledger-account.entity';
 /**
  * LedgerEntry — IMMUTABLE.
  * Entries are NEVER updated or deleted after creation.
- * The source of truth for all money movements on Rands.
+ * The source of truth for all money movements on Shopflow.
  */
 @Entity('ledger_entries')
 export class LedgerEntry {
