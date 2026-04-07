@@ -21,6 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Header } from "@/components/header"
 import { MobileNav } from "@/components/mobile-nav"
 import { Footer } from "@/components/footer"
+import { FollowButton } from "@/components/follow-button"
 import { products } from "@/lib/products-data"
 
 // Mock seller data - in a real app this would come from a database
@@ -108,7 +109,6 @@ export default function SellerPage() {
   const params = useParams()
   const username = params.username as string
   const seller = sellersData[username]
-  const [isFollowing, setIsFollowing] = useState(false)
   const [likedProducts, setLikedProducts] = useState<number[]>([])
 
   const sellerProducts = products.filter(
@@ -183,16 +183,10 @@ export default function SellerPage() {
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <Button
-                    variant={isFollowing ? "secondary" : "default"}
-                    onClick={() => setIsFollowing(!isFollowing)}
-                    className="min-w-[100px]"
-                  >
-                    {isFollowing ? "Following" : "Follow"}
-                  </Button>
-                  <Button variant="outline" size="icon">
-                    <Share2 className="h-4 w-4" />
-                  </Button>
+                    <FollowButton className="min-w-[100px]" size="pill-sm" />
+                    <Button variant="outline" size="icon">
+                      <Share2 className="h-4 w-4" />
+                    </Button>
                   <Button variant="outline" size="icon">
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>

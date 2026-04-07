@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import Image from "next/image"
-import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, ShoppingBag, Play } from "lucide-react"
+import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Play } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { FollowButton } from "@/components/follow-button"
@@ -86,7 +86,7 @@ export function FeedPost({
         <div className="flex items-center gap-2 sm:gap-3">
           <FollowButton
             initialIsFollowing={seller.isFollowing}
-            className="h-7 px-3 text-xs"
+            size="pill-sm"
           />
           <Button variant="ghost" size="icon" className="h-8 w-8">
             <MoreHorizontal className="h-5 w-5" />

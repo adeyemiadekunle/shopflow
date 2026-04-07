@@ -16,6 +16,8 @@ const buttonVariants = cva(
           'border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50',
         secondary:
           'bg-secondary text-secondary-foreground hover:bg-secondary/80',
+        section:
+          'border border-border/70 bg-background/80 text-muted-foreground shadow-xs backdrop-blur-sm hover:border-accent/40 hover:bg-secondary hover:text-foreground',
         ghost:
           'hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50',
         link: 'text-primary underline-offset-4 hover:underline',
@@ -23,6 +25,8 @@ const buttonVariants = cva(
       size: {
         default: 'h-9 px-4 py-2 has-[>svg]:px-3',
         sm: 'h-8 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5',
+        'pill-sm': 'h-8 rounded-full gap-1.5 px-3.5 text-xs has-[>svg]:px-3',
+        pill: 'h-9 rounded-full gap-1.5 px-4 text-xs has-[>svg]:px-3.5',
         lg: 'h-10 rounded-md px-6 has-[>svg]:px-4',
         icon: 'size-9',
         'icon-sm': 'size-8',
