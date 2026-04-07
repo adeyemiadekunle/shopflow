@@ -1,24 +1,55 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## Shopflow Frontend
 
-## Getting Started
+Next.js frontend for Shopflow. It can run locally against the backend API or be deployed separately from the backend.
 
-First, run the development server:
+## Local Development
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+Create `apps/frontend/.env.local`:
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Run the frontend on port `3001` so it does not conflict with the backend default port:
+
+```bash
+pnpm dev -- --port 3001
+```
+
+Open [http://localhost:3001](http://localhost:3001) with your browser to see the result.
+
+If you are running the backend locally, make sure `apps/backend/.env` allows the frontend origin:
+
+```env
+CORS_ORIGINS=http://localhost:3000,http://localhost:3001
+FRONTEND_BASE_URL=http://localhost:3001
+```
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Separate Deployment
+
+The frontend can be deployed separately from the backend.
+
+Set the frontend environment variable to your deployed API:
+
+```env
+NEXT_PUBLIC_API_URL=https://api.yourdomain.com/api/v1
+```
+
+The backend should then allow the deployed frontend origin with:
+
+```env
+CORS_ORIGINS=https://app.yourdomain.com
+FRONTEND_BASE_URL=https://app.yourdomain.com
+```
+
+Build commands:
+
+```bash
+pnpm build
+pnpm start
+```
 
 ## Learn More
 

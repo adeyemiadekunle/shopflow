@@ -7,14 +7,14 @@ Production-grade NestJS backend for the Shopflow social ecommerce platform.
 ## Quick Start
 
 ```bash
-# Install dependencies
-npm install
+# Install dependencies from the repo root
+pnpm install
 
 # Copy environment template
 cp .env.example .env
 
 # Start dev server (watch mode)
-npm run start:dev
+pnpm start:dev
 ```
 
 - **API:** `http://localhost:3000/api/v1`
@@ -28,14 +28,14 @@ npm run start:dev
 ## Commands
 
 ```bash
-npm run start:dev    # Dev server (watch)
-npm run build        # Production build
-npm run start:prod   # Start production build
-npm run db:migrate   # Run DB migrations
-npm run db:migrate:revert # Revert latest migration
-npm test             # Unit tests
-npm run test:cov     # Test coverage
-npm run lint         # ESLint
+pnpm start:dev    # Dev server (watch)
+pnpm build        # Production build
+pnpm start:prod   # Start production build
+pnpm db:migrate   # Run DB migrations
+pnpm db:migrate:revert # Revert latest migration
+pnpm test         # Unit tests
+pnpm test:cov     # Test coverage
+pnpm lint         # ESLint
 ```
 
 ## Environment Variables
@@ -110,8 +110,8 @@ Feature rollout model:
 ## Testing
 
 ```bash
-npm test              # 16/16 tests passing
-npm run test:cov      # Coverage report
+pnpm test             # 16/16 tests passing
+pnpm test:cov         # Coverage report
 ```
 
 > Test suites: 12 suites, 64/64 tests passing.

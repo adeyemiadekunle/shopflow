@@ -4,10 +4,10 @@ WORKDIR /app
 
 RUN corepack enable
 
-COPY apps/frontend/package.json ./package.json
-COPY apps/frontend/pnpm-lock.yaml ./pnpm-lock.yaml
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/frontend/package.json ./apps/frontend/package.json
 
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --filter shopflow-frontend...
 
 FROM node:22-alpine AS builder
 
@@ -18,7 +18,12 @@ RUN corepack enable
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/package.json ./package.json
 COPY --from=deps /app/pnpm-lock.yaml ./pnpm-lock.yaml
-COPY apps/frontend ./
+COPY --from=deps /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
+COPY --from=deps /app/apps/frontend/package.json ./apps/frontend/package.json
+COPY --from=deps /app/apps/frontend/node_modules ./apps/frontend/node_modules
+COPY apps/frontend ./apps/frontend
+
+WORKDIR /app/apps/frontend
 
 RUN pnpm build
 
@@ -35,12 +40,17 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV HOSTNAME=0.0.0.0
 ENV PORT=3000
 
-COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/pnpm-lock.yaml ./pnpm-lock.yaml
-COPY --from=builder /app/next.config.mjs ./next.config.mjs
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/frontend/package.json ./apps/frontend/package.json
+COPY --from=builder /app/apps/frontend/node_modules ./apps/frontend/node_modules
+COPY --from=builder /app/apps/frontend/next.config.mjs ./apps/frontend/next.config.mjs
+COPY --from=builder /app/apps/frontend/public ./apps/frontend/public
+COPY --from=builder /app/apps/frontend/.next ./apps/frontend/.next
+
+WORKDIR /app/apps/frontend
 
 USER appuser
 
