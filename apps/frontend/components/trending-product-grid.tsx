@@ -1,8 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import Image from "next/image"
 import { TrendingUp } from "lucide-react"
+import { ResponsiveCarousel } from "@/components/responsive-carousel"
 import { Button } from "@/components/ui/button"
 import { TrendingProductCard, type TrendingProduct } from "@/components/trending-product-card"
 
@@ -71,18 +70,8 @@ const trendingProducts: TrendingProduct[] = [
 ]
 
 export function TrendingProductGrid() {
-  const [likedProducts, setLikedProducts] = useState<number[]>([])
-
-  const toggleLike = (productId: number) => {
-    setLikedProducts((prev) =>
-      prev.includes(productId)
-        ? prev.filter((id) => id !== productId)
-        : [...prev, productId]
-    )
-  }
-
   return (
-    <section className="px-4 md:px-6 py-6">
+    <section className="px-4 md:px-6 py-2 md:py-4">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <TrendingUp className="h-5 w-5 text-accent" />
@@ -93,12 +82,15 @@ export function TrendingProductGrid() {
         </Button>
       </div>
 
-      {/* Horizontal scrolling on mobile, grid on larger screens */}
-      <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2 md:grid md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 md:gap-3 md:overflow-x-visible">
-        {trendingProducts.slice(0, 5).map((product) => (
-          <TrendingProductCard key={product.id} product={product} />
-        ))}
-      </div>
+      <ResponsiveCarousel
+        className="pb-1"
+        contentClassName="-ml-2.5 md:-ml-4"
+        itemClassName="basis-[68%] pl-2.5 min-[460px]:basis-[64%] sm:basis-[52%] md:basis-1/3 md:pl-4 lg:basis-1/4 xl:basis-1/5"
+        items={trendingProducts.slice(0, 5)}
+        getItemKey={(product) => product.id}
+        showControls={true}
+        renderItem={(product) => <TrendingProductCard product={product} />}
+      />
     </section>
   )
 }

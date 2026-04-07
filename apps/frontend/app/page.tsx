@@ -12,9 +12,9 @@ export default function Home() {
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
       
-      <div className="flex flex-1 max-w-7xl mx-auto w-full">
+      <div className="flex flex-1 max-w-7xl mx-auto w-full min-w-0">
         {/* Main Content */}
-        <main className="flex-1 pb-20 md:pb-8">
+        <main className="min-w-0 flex-1 pb-20 md:pb-8">
           {/* Stories */}
           <Stories />
 

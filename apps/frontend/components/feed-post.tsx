@@ -9,7 +9,7 @@ import { FollowButton } from "@/components/follow-button"
 import { FeedProductCard, type FeedProduct } from "@/components/feed-product-card"
 import { PostComments, type Comment } from "@/components/post-comments"
 
-interface FeedPostProps {
+export interface FeedPostProps {
   id: number
   seller: {
     name: string

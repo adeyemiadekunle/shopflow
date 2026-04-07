@@ -21,10 +21,10 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "typeorm": "typeorm-ts-node-commonjs",
-    "db:migrate": "npm run typeorm -- -d src/database/data-source.ts migration:run",
-    "db:migrate:revert": "npm run typeorm -- -d src/database/data-source.ts migration:revert",
-    "db:migration:generate": "npm run typeorm -- -d src/database/data-source.ts migration:generate",
-    "db:migration:create": "npm run typeorm -- migration:create"
+    "db:migrate": "pnpm run typeorm -- -d src/database/data-source.ts migration:run",
+    "db:migrate:revert": "pnpm run typeorm -- -d src/database/data-source.ts migration:revert",
+    "db:migration:generate": "pnpm run typeorm -- -d src/database/data-source.ts migration:generate",
+    "db:migration:create": "pnpm run typeorm -- migration:create"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1019.0",
@@ -51,6 +51,7 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.4",
     "ioredis": "^5.10.1",
+    "jsonwebtoken": "^9.0.2",
     "nestjs-pino": "^4.6.1",
     "nodemailer": "^8.0.4",
     "passport": "^0.7.0",
@@ -75,6 +76,7 @@
     "@nestjs/testing": "^11.0.1",
     "@types/bcrypt": "^6.0.0",
     "@types/express": "^5.0.0",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.10.7",
     "@types/nodemailer": "^7.0.11",

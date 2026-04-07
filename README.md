@@ -16,6 +16,7 @@
 - [Addresses](#addresses--apiv1addresses)
 - [Cart](#cart--apiv1cart)
 - [Testing](#testing)
+- [Deployment](#deployment)
 - [Docker & Infrastructure](#docker--infrastructure)
 - [CI/CD](#cicd)
 - [Project Structure](#project-structure)
@@ -74,8 +75,8 @@ Key design principles:
 ### Local setup
 
 ```bash
-# 1. Install backend dependencies from the repo root
-npm install --workspace backend
+# 1. Install workspace dependencies from the repo root
+pnpm install
 
 # 2. Copy and fill in environment variables
 cd apps/backend
@@ -86,14 +87,39 @@ cd ../..
 docker compose up -d postgres redis
 
 # 4. Run database migrations
-npm run db:migrate
+pnpm db:migrate
 
 # 5. Start the API in dev/watch mode from the repo root
-npm run dev
+pnpm dev
 ```
 
 API available at: `http://localhost:3000/api/v1`  
 Swagger UI: `http://localhost:3000/api-docs`
+
+### Local frontend setup
+
+Run the frontend in a second terminal so it does not clash with the backend on port `3000`.
+
+Create `apps/frontend/.env.local`:
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1
+```
+
+Start the frontend:
+
+```bash
+pnpm --filter shopflow-frontend dev -- --port 3001
+```
+
+Frontend available at: `http://localhost:3001`
+
+For local split frontend/backend development, make sure `apps/backend/.env` includes:
+
+```env
+CORS_ORIGINS=http://localhost:3000,http://localhost:3001
+FRONTEND_BASE_URL=http://localhost:3001
+```
 
 ---
 
@@ -143,16 +169,19 @@ Provider routing rules:
 
 ```bash
 # Development (watch mode from repo root)
-npm run dev
+pnpm dev
+
+# Frontend development on a separate port
+pnpm --filter shopflow-frontend dev -- --port 3001
 
 # Run pending database migrations
-npm run db:migrate
+pnpm db:migrate
 
 # Revert the latest migration
-npm run db:migrate:revert
+pnpm db:migrate:revert
 
 # Production build
-npm run build
+pnpm build
 
 # Or via Makefile (from project root)
 make dev          # Start dev server
@@ -160,6 +189,35 @@ make docker-up    # Start all Docker services
 make test         # Run unit tests
 make lint         # Run ESLint
 ```
+
+---
+
+## Deployment
+
+Frontend and backend can be deployed independently.
+
+Common split deployment setup:
+- frontend on Vercel, Netlify, or a static/container host
+- backend on Docker, Render, Railway, Fly.io, or a VM
+- frontend calling the public backend API over HTTPS
+
+Recommended environment variables for split deployment:
+
+```env
+# frontend
+NEXT_PUBLIC_API_URL=https://api.yourdomain.com/api/v1
+
+# backend
+APP_BASE_URL=https://api.yourdomain.com
+CORS_ORIGINS=https://app.yourdomain.com
+FRONTEND_BASE_URL=https://app.yourdomain.com
+```
+
+Container builds are available for each app:
+- backend image: `docker build -f apps/backend/Dockerfile -t shopflow-api .`
+- frontend image: `docker build -f apps/frontend/Dockerfile -t shopflow-frontend .`
+
+The root `docker-compose.yml` is still useful for running the full stack together locally, while separate deployments let you ship the frontend and backend on different release cycles.
 
 ---
 
@@ -623,13 +681,13 @@ Platform rollout is admin-controlled:
 
 ```bash
 # Unit tests
-npm test
+pnpm test
 
 # Watch mode
-npm run test:watch
+pnpm --filter backend test:watch
 
 # Coverage report
-npm run test:cov
+pnpm --filter backend test:cov
 ```
 
 Current test suites: 12 suites, 64/64 tests passing.

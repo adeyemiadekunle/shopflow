@@ -5,31 +5,31 @@ help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 
 dev: ## Start backend in watch mode
-	cd apps/backend && npm run start:dev
+	cd apps/backend && pnpm run start:dev
 
 build: ## Build backend for production
-	cd apps/backend && npm run build
+	cd apps/backend && pnpm run build
 
 test: ## Run unit tests
-	cd apps/backend && npm run test
+	cd apps/backend && pnpm run test
 
 test-e2e: ## Run end-to-end tests
-	cd apps/backend && npm run test:e2e
+	cd apps/backend && pnpm run test:e2e
 
 lint: ## Lint backend code
-	cd apps/backend && npm run lint
+	cd apps/backend && pnpm run lint
 
 format: ## Format backend code
-	cd apps/backend && npm run format
+	cd apps/backend && pnpm run format
 
 migrate-run: ## Run pending TypeORM migrations
-	cd apps/backend && npm run typeorm migration:run -- -d dist/database/data-source.js
+	cd apps/backend && pnpm run typeorm migration:run -- -d dist/database/data-source.js
 
 migrate-generate: ## Generate a new migration (use: make migrate-generate name=CreateUsers)
-	cd apps/backend && npm run typeorm migration:generate -- -d src/database/data-source.ts src/database/migrations/$(name)
+	cd apps/backend && pnpm run typeorm migration:generate -- -d src/database/data-source.ts src/database/migrations/$(name)
 
 migrate-revert: ## Revert last migration
-	cd apps/backend && npm run typeorm migration:revert -- -d dist/database/data-source.js
+	cd apps/backend && pnpm run typeorm migration:revert -- -d dist/database/data-source.js
 
 docker-up: ## Start all services with Docker Compose
 	docker compose up -d

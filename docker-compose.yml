@@ -1,13 +1,13 @@
 services:
   api:
     build:
-      context: ./apps/backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/backend/Dockerfile
     container_name: shopflow-api
     command:
       - sh
       - -lc
-      - node node_modules/typeorm/cli.js -d dist/database/data-source.js migration:run && node dist/main.js
+      - pnpm exec typeorm -d dist/database/data-source.js migration:run && node dist/main.js
     ports:
       - '3000:3000'
     depends_on:
