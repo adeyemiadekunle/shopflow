@@ -26,6 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Header } from "@/components/header"
 import { MobileNav } from "@/components/mobile-nav"
 import { Footer } from "@/components/footer"
+import { FollowButton } from "@/components/follow-button"
 import { products } from "@/lib/products-data"
 import { useCart } from "@/lib/cart-context"
 
@@ -221,7 +222,7 @@ export default function ProductPage() {
                     </div>
                     <p className="text-xs text-muted-foreground">Sold by this seller</p>
                   </div>
-                  <Button variant="secondary" size="sm">Follow</Button>
+                  <FollowButton variant="secondary" size="pill-sm" />
                 </div>
               </Link>
 

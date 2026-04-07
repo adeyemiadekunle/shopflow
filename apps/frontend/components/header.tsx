@@ -106,7 +106,7 @@ export function Header() {
             </Button>
           </Link>
           <Link href="/seller/register">
-            <Button size="sm" className="rounded-full gap-2">
+            <Button size="pill-sm">
               <Plus className="h-4 w-4" />
               Sell
             </Button>

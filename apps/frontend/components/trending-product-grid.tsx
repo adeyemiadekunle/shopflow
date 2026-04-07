@@ -2,7 +2,7 @@
 
 import { TrendingUp } from "lucide-react"
 import { ResponsiveCarousel } from "@/components/responsive-carousel"
-import { Button } from "@/components/ui/button"
+import { SectionActionButton } from "@/components/section-action-button"
 import { TrendingProductCard, type TrendingProduct } from "@/components/trending-product-card"
 
 const trendingProducts: TrendingProduct[] = [
@@ -77,9 +77,7 @@ export function TrendingProductGrid() {
           <TrendingUp className="h-5 w-5 text-accent" />
           <h2 className="text-lg font-semibold">Trending Now</h2>
         </div>
-        <Button variant="ghost" size="sm" className="text-muted-foreground">
-          See all
-        </Button>
+        <SectionActionButton />
       </div>
 
       <ResponsiveCarousel

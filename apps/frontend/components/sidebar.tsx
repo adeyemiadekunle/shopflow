@@ -1,10 +1,9 @@
 "use client"
 
-import Image from "next/image"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
 import { FollowButton } from "@/components/follow-button"
 import { LiveShoppingCard, type LiveShoppingEvent } from "@/components/live-shopping-card"
+import { SectionActionButton } from "@/components/section-action-button"
 import { Radio, Flame } from "lucide-react"
 
 const suggestedSellers = [
@@ -81,9 +80,7 @@ export function Sidebar() {
             <Radio className="h-4 w-4 text-red-500" />
             <h3 className="text-sm font-semibold">Live Shopping</h3>
           </div>
-          <Button variant="ghost" size="sm" className="text-xs text-muted-foreground h-auto p-0">
-            See all
-          </Button>
+          <SectionActionButton />
         </div>
         <div className="space-y-3">
           {liveNow.map((live) => (
@@ -99,9 +96,7 @@ export function Sidebar() {
             <Flame className="h-4 w-4 text-accent" />
             <h3 className="text-sm font-semibold">Suggested Sellers</h3>
           </div>
-          <Button variant="ghost" size="sm" className="text-xs text-muted-foreground h-auto p-0">
-            See all
-          </Button>
+          <SectionActionButton />
         </div>
         <div className="space-y-3">
           {suggestedSellers.map((seller) => (
@@ -126,7 +121,7 @@ export function Sidebar() {
                   <p className="text-xs text-muted-foreground">{seller.followers} followers</p>
                 </div>
               </div>
-              <FollowButton variant="outline" className="h-7 text-xs" />
+              <FollowButton variant="outline" />
             </div>
           ))}
         </div>

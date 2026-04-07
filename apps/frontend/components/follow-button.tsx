@@ -8,8 +8,8 @@ interface FollowButtonProps {
   initialIsFollowing?: boolean
   sellerId?: string | number
   className?: string
-  size?: "default" | "sm" | "lg" | "icon"
-  variant?: "default" | "outline" | "secondary" | "ghost"
+  size?: "default" | "sm" | "pill-sm" | "pill" | "lg" | "icon"
+  variant?: "default" | "outline" | "secondary" | "ghost" | "section"
 }
 
 export function FollowButton({

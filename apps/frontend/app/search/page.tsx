@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Header } from "@/components/header"
 import { MobileNav } from "@/components/mobile-nav"
 import { Footer } from "@/components/footer"
+import { FollowButton } from "@/components/follow-button"
 import { products } from "@/lib/products-data"
 
 const trendingSearches = [
@@ -230,7 +231,7 @@ function SearchContent() {
                             <p className="text-sm text-muted-foreground">@{seller.username}</p>
                             <p className="text-xs text-muted-foreground mt-1">{seller.followers} followers</p>
                           </div>
-                          <Button variant="secondary" size="sm">Follow</Button>
+                          <FollowButton variant="secondary" size="pill-sm" />
                         </div>
                       </Link>
                     ))}

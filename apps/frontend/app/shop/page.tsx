@@ -13,7 +13,6 @@ import {
   Watch,
   SlidersHorizontal,
   Heart,
-  ShoppingBag,
   Star,
   ChevronDown,
   X,
@@ -39,6 +38,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Header } from "@/components/header"
 import { MobileNav } from "@/components/mobile-nav"
 import { Footer } from "@/components/footer"
+import { AddToCartButton } from "@/components/add-to-cart-button"
 import { products, categories, type Product } from "@/lib/products-data"
 
 const categoryIcons: Record<string, React.ElementType> = {
@@ -413,16 +413,10 @@ function ProductCard({
           )}
 
           {/* Quick Add */}
-          <button
-            onClick={(e) => {
-              e.preventDefault()
-              // Add to cart logic
-            }}
-            className="absolute bottom-2 left-2 right-2 h-8 rounded-lg bg-primary text-primary-foreground text-xs font-medium flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
-          >
-            <ShoppingBag className="h-3.5 w-3.5" />
-            Add to Cart
-          </button>
+          <AddToCartButton
+            productId={product.id}
+            className="absolute right-2 bottom-2 left-2 rounded-lg opacity-0 transition-opacity group-hover:opacity-100"
+          />
         </div>
 
         {/* Info */}
