@@ -4,6 +4,7 @@ import { useState, Suspense } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { ArrowLeft, ArrowRight, Store, User, MapPin, CreditCard, FileCheck, Check } from "lucide-react"
+import { BrandLogo } from "@/components/brand-logo"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/auth-context"
 import { NIGERIAN_STATES, NIGERIAN_BANKS } from "@/lib/types"
@@ -153,7 +154,7 @@ function SellerRegisterContent() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="p-4 md:p-6 flex items-center justify-between border-b border-border">
+      <header className="relative flex items-center justify-between border-b border-border p-4 md:p-6">
         <button 
           onClick={currentStep === 1 ? () => router.back() : handleBack}
           className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
@@ -161,13 +162,8 @@ function SellerRegisterContent() {
           <ArrowLeft className="h-4 w-4" />
           <span>Back</span>
         </button>
-        <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-accent flex items-center justify-center">
-            <span className="text-accent-foreground font-bold text-sm">S</span>
-          </div>
-          <span className="font-semibold">Seller Registration</span>
-        </div>
-        <div className="w-16" /> {/* Spacer */}
+        <BrandLogo className="absolute left-1/2 -translate-x-1/2" />
+        <div className="w-16" aria-hidden="true" />
       </header>
 
       {/* Progress Steps */}
