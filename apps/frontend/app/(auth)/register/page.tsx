@@ -3,8 +3,9 @@
 import { useState, Suspense } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { ArrowLeft, ArrowRight, Store, User } from "lucide-react"
+import { ArrowLeft, ArrowRight, Store } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { BrandLogo } from "@/components/brand-logo"
 import { useAuth } from "@/lib/auth-context"
 
 function RegisterContent() {
@@ -44,11 +45,13 @@ function RegisterContent() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="p-4 md:p-6">
+      <header className="relative flex items-center justify-between p-4 md:p-6">
         <Link href="/login" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft className="h-4 w-4" />
           <span>Back</span>
         </Link>
+        <BrandLogo className="absolute left-1/2 -translate-x-1/2" />
+        <div className="w-14" aria-hidden="true" />
       </header>
 
       {/* Main Content */}

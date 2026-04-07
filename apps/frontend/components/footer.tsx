@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { Instagram, Twitter, Youtube, Facebook } from "lucide-react"
+import { BrandLogo } from "@/components/brand-logo"
 
 const footerLinks = {
   shop: [
@@ -44,9 +45,7 @@ export function Footer() {
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 lg:gap-12">
           {/* Brand Column */}
           <div className="col-span-2 md:col-span-4 lg:col-span-1">
-            <Link href="/" className="inline-block">
-              <span className="text-2xl font-bold tracking-tight">shopflow.</span>
-            </Link>
+            <BrandLogo className="inline-flex" />
             <p className="mt-4 text-sm text-muted-foreground max-w-xs">
               Discover, share, and shop from verified sellers. The future of social commerce is here.
             </p>

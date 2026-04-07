@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Phone, ArrowRight, Store, ShoppingBag } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { BrandLogo } from "@/components/brand-logo"
 import { useAuth } from "@/lib/auth-context"
 
 export default function LoginPage() {
@@ -44,12 +45,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="p-4 md:p-6">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-accent flex items-center justify-center">
-            <span className="text-accent-foreground font-bold text-sm">S</span>
-          </div>
-          <span className="font-semibold text-lg">Shopflow</span>
-        </Link>
+        <BrandLogo />
       </header>
 
       {/* Main Content */}

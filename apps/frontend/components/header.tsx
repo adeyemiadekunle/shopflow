@@ -1,37 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { Search, ShoppingCart, Heart, Bell, Menu, X, Plus } from "lucide-react";
-import { useTheme } from "next-themes";
+import { Search, ShoppingCart, Heart, Bell, Menu, X, Plus, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { BrandLogo } from "@/components/brand-logo";
 import { useCart } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const { totalItems } = useCart();
   const { user, isAuthenticated } = useAuth();
-  const { theme, resolvedTheme } = useTheme();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const themeLabel = mounted
-    ? `${theme ?? "system"} -> ${resolvedTheme ?? "unknown"}`
-    : "theme...";
+  const isSeller = user?.role === "seller";
+  const catalogLabel = isSeller ? "Store" : "Shop";
+  const catalogHref = isSeller ? "/seller/dashboard" : "/shop";
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex h-16 items-center justify-between px-4 md:px-6">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2">
-          <span className="text-2xl font-bold tracking-tight">shopflow.</span>
-        </Link>
+        <BrandLogo />
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-4 lg:gap-8">
@@ -42,16 +33,10 @@ export function Header() {
             Discover
           </Link>
           <Link
-            href="/search"
+            href={catalogHref}
             className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
-            Sellers
-          </Link>
-          <Link
-            href="/shop"
-            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Shop
+            {catalogLabel}
           </Link>
           <Link
             href="/live"
@@ -83,45 +68,55 @@ export function Header() {
 
         {/* Desktop Actions */}
         <div className="hidden md:flex items-center gap-3">
-          <div className="rounded-full border border-border bg-secondary px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-            {themeLabel}
-          </div>
-          <Button variant="ghost" size="icon" className="relative">
-            <Bell className="h-5 w-5" />
-            <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-accent text-[10px] font-medium flex items-center justify-center text-accent-foreground">
-              3
-            </span>
-          </Button>
-          <Button variant="ghost" size="icon">
-            <Heart className="h-5 w-5" />
-          </Button>
-          <Link href="/cart">
-            <Button variant="ghost" size="icon" className="relative h-10 w-10">
-              <ShoppingCart className="h-6 w-6" />
-              {totalItems > 0 && (
+          {isAuthenticated ? (
+            <>
+              <Button variant="ghost" size="icon" className="relative">
+                <Bell className="h-5 w-5" />
                 <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-accent text-[10px] font-medium flex items-center justify-center text-accent-foreground">
-                  {totalItems > 9 ? "9+" : totalItems}
+                  3
                 </span>
-              )}
-            </Button>
-          </Link>
+              </Button>
+              <Button variant="ghost" size="icon">
+                <Heart className="h-5 w-5" />
+              </Button>
+              <Link href="/cart">
+                <Button variant="ghost" size="icon" className="relative h-10 w-10">
+                  <ShoppingCart className="h-6 w-6" />
+                  {totalItems > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-accent text-[10px] font-medium flex items-center justify-center text-accent-foreground">
+                      {totalItems > 9 ? "9+" : totalItems}
+                    </span>
+                  )}
+                </Button>
+              </Link>
+            </>
+          ) : (
+            <Link href="/login">
+              <Button variant="outline" size="pill-sm">
+                <LogIn className="h-4 w-4" />
+                Sign In
+              </Button>
+            </Link>
+          )}
           <Link href="/seller/register">
             <Button size="pill-sm">
               <Plus className="h-4 w-4" />
               Sell
             </Button>
           </Link>
-          <Link href={isAuthenticated ? "/account" : "/login"}>
-            <Avatar className="h-8 w-8 cursor-pointer">
-              <AvatarImage
-                src={
-                  user?.avatarUrl ||
-                  "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&h=80&fit=crop"
-                }
-              />
-              <AvatarFallback>{user?.displayName?.charAt(0) || "U"}</AvatarFallback>
-            </Avatar>
-          </Link>
+          {isAuthenticated ? (
+            <Link href="/account">
+              <Avatar className="h-8 w-8 cursor-pointer">
+                <AvatarImage
+                  src={
+                    user?.avatarUrl ||
+                    "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&h=80&fit=crop"
+                  }
+                />
+                <AvatarFallback>{user?.displayName?.charAt(0) || "U"}</AvatarFallback>
+              </Avatar>
+            </Link>
+          ) : null}
         </div>
 
         {/* Mobile Menu Button */}
@@ -155,9 +150,6 @@ export function Header() {
       {isMenuOpen && (
         <div className="md:hidden border-t border-border bg-background">
           <div className="p-4 space-y-4">
-            <div className="rounded-full border border-border bg-secondary px-3 py-2 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-              {themeLabel}
-            </div>
             <Link href="/search" className="relative block">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <div className="w-full h-10 pl-10 pr-4 rounded-full bg-secondary text-sm text-muted-foreground flex items-center">
@@ -172,16 +164,10 @@ export function Header() {
                 Discover
               </Link>
               <Link
-                href="/search"
+                href={catalogHref}
                 className="text-sm font-medium text-muted-foreground py-2 px-3 rounded-lg hover:bg-secondary"
               >
-                Sellers
-              </Link>
-              <Link
-                href="/shop"
-                className="text-sm font-medium text-muted-foreground py-2 px-3 rounded-lg hover:bg-secondary"
-              >
-                Shop
+                {catalogLabel}
               </Link>
               <Link
                 href="/live"
@@ -189,6 +175,20 @@ export function Header() {
               >
                 Live
                 <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+              </Link>
+              {!isAuthenticated ? (
+                <Link
+                  href="/login"
+                  className="text-sm font-medium text-muted-foreground py-2 px-3 rounded-lg hover:bg-secondary"
+                >
+                  Sign In
+                </Link>
+              ) : null}
+              <Link
+                href="/seller/register"
+                className="text-sm font-medium text-muted-foreground py-2 px-3 rounded-lg hover:bg-secondary"
+              >
+                Sell
               </Link>
             </nav>
           </div>
