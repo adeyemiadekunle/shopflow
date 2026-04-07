@@ -2,13 +2,22 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, Search, ShoppingBag, Store, User, LogIn } from "lucide-react"
+import {
+  Home,
+  LogIn,
+  MessageCircle,
+  Search,
+  ShoppingBag,
+  Store,
+  User,
+} from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 
 export function MobileNav() {
   const pathname = usePathname()
   const { isAuthenticated, user } = useAuth()
   const isSeller = user?.role === "seller"
+  const messagesHref = isAuthenticated ? "/messages" : "/login"
 
   const navItems = [
     { icon: Home, label: "Home", href: "/" },
@@ -16,6 +25,7 @@ export function MobileNav() {
     isSeller
       ? { icon: Store, label: "Store", href: "/seller/dashboard" }
       : { icon: ShoppingBag, label: "Shop", href: "/shop" },
+    { icon: MessageCircle, label: "Chat", href: messagesHref },
     isAuthenticated
       ? { icon: User, label: "Account", href: "/account" }
       : { icon: LogIn, label: "Login", href: "/login" },
@@ -23,7 +33,7 @@ export function MobileNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 safe-area-inset-bottom">
-      <div className="grid h-16 grid-cols-4 items-center pb-safe">
+      <div className="grid h-16 grid-cols-5 items-center pb-safe">
         {navItems.map((item) => {
           const isActive = pathname === item.href || 
             (item.href !== "/" && pathname.startsWith(item.href))

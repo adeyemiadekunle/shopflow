@@ -17,6 +17,7 @@ export function Header() {
   const isSeller = user?.role === "seller";
   const catalogLabel = isSeller ? "Store" : "Shop";
   const catalogHref = isSeller ? "/seller/dashboard" : "/shop";
+  const mobileNotificationsHref = isAuthenticated ? "/notifications" : "/login";
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -121,6 +122,16 @@ export function Header() {
 
         {/* Mobile Menu Button */}
         <div className="flex md:hidden items-center">
+          <Link href={mobileNotificationsHref}>
+            <Button variant="ghost" size="icon" className="relative h-11 w-11">
+              <Bell className="h-7 w-7" />
+              {isAuthenticated ? (
+                <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-accent text-[10px] font-medium flex items-center justify-center text-accent-foreground">
+                  3
+                </span>
+              ) : null}
+            </Button>
+          </Link>
           <Link href="/cart">
             <Button variant="ghost" size="icon" className="relative h-11 w-11">
               <ShoppingCart className="h-8 w-8" />
