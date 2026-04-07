@@ -25,9 +25,9 @@ export function TrendingProductCard({ product }: TrendingProductCardProps) {
   const [isLiked, setIsLiked] = useState(false)
 
   return (
-    <div className="group relative bg-card rounded-xl overflow-hidden border border-border hover:border-accent/50 transition-all flex-shrink-0 w-52 sm:w-60 md:w-auto flex flex-col">
+    <div className="group relative flex w-full flex-col overflow-hidden rounded-xl border border-border bg-card transition-all hover:border-accent/50">
       {/* Image Frame */}
-      <div className="relative aspect-[4/5] overflow-hidden">
+      <div className="relative aspect-[4/3.45] overflow-hidden sm:aspect-[4/5]">
         <Image
           src={product.image}
           alt={product.name}
@@ -87,7 +87,7 @@ export function TrendingProductCard({ product }: TrendingProductCardProps) {
           )}
         </div>
 
-        <div className="mt-auto pt-2 border-t border-border/30">
+        <div className="mt-auto pt-1 border-t border-border/30">
           <p className="text-xs text-accent font-medium truncate" title={`Sold by ${product.seller}`}>
             Sold by {product.seller}
           </p>
